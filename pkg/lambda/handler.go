@@ -99,11 +99,15 @@ func (handler *Handler) Init(ctx context.Context) error {
 	handler.Region = os.Getenv("REGION")
 	handler.BuildspecS3Bucket = os.Getenv("BUILDSPEC_S3_BUCKET")
 	handler.BuildspecS3KeyPrefix = os.Getenv("BUILDSPEC_S3_KEY_PREFIX")
-
 	sess := session.Must(session.NewSession())
-	if err := handler.readSecret(ctx, sess); err != nil {
-		return err
+	if secretNameGitHubToken := os.Getenv("SSM_PARAMETER_NAME_GITHUB_TOKEN"); secretNameGitHubToken != "" {
+		if secretNameWebhookSecret := os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET"); secretNameWebhookSecret != "" {
+			if err := handler.readSecretFromSSM(ctx, sess, secretNameGitHubToken, secretNameWebhookSecret); err != nil {
+				return err
+			}
+		}
 	}
+
 	handler.GitHub = github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: handler.Secret.GitHubToken},
 	)))

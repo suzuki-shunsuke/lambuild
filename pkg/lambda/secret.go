@@ -14,16 +14,16 @@ type Secret struct {
 	WebhookSecret string `json:"webhook_secret"`
 }
 
-func (handler *Handler) readSecret(ctx context.Context, sess *session.Session) error {
+func (handler *Handler) readSecretFromSSM(ctx context.Context, sess *session.Session, secretNameGitHubToken, secretNameWebhookSecret string) error {
 	svc := ssm.New(sess, aws.NewConfig().WithRegion(handler.Region))
 	var err error
 
-	handler.Secret.GitHubToken, err = handler.getSecret(ctx, svc, "github_token")
+	handler.Secret.GitHubToken, err = handler.getSecret(ctx, svc, secretNameGitHubToken)
 	if err != nil {
-		return fmt.Errorf("get github_token: %w", err)
+		return fmt.Errorf("get GitHub Access Token: %w", err)
 	}
 
-	handler.Secret.WebhookSecret, err = handler.getSecret(ctx, svc, "lambuild_webhook_secret")
+	handler.Secret.WebhookSecret, err = handler.getSecret(ctx, svc, secretNameWebhookSecret)
 	if err != nil {
 		return fmt.Errorf("get a secret webhook: %w", err)
 	}
