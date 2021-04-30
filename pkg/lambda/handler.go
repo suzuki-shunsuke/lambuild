@@ -151,12 +151,38 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 	}
 
 	if len(graphElems) == 1 {
-		content = graphElems[0].Buildspec
-		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, &codebuild.StartBuildInput{
-			BuildspecOverride: aws.String(content),
+		graphElem := graphElems[0]
+		input := &codebuild.StartBuildInput{
+			BuildspecOverride: aws.String(graphElem.Buildspec),
 			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
 			SourceVersion:     aws.String(body.After),
-		})
+		}
+		if graphElem.DebugSession {
+			input.DebugSessionEnabled = aws.Bool(true)
+		}
+
+		envs := make([]*codebuild.EnvironmentVariable, 0, len(graphElem.Env.Variables))
+		for k, v := range graphElem.Env.Variables {
+			envs = append(envs, &codebuild.EnvironmentVariable{
+				Name:  aws.String(k),
+				Value: aws.String(v),
+			})
+		}
+		input.EnvironmentVariablesOverride = envs
+
+		if graphElem.Env.ComputeType != "" {
+			input.ComputeTypeOverride = aws.String(graphElem.Env.ComputeType)
+		}
+
+		if graphElem.Env.Image != "" {
+			input.ImageOverride = aws.String(graphElem.Env.Image)
+		}
+
+		if graphElem.Env.PrivilegedMode {
+			input.PrivilegedModeOverride = aws.Bool(true)
+		}
+
+		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, input)
 		if err != nil {
 			return fmt.Errorf("start a batch build: %w", err)
 		}
@@ -168,9 +194,8 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		if err != nil {
 			return err
 		}
-		content = string(builtContent)
 		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-			BuildspecOverride: aws.String(content),
+			BuildspecOverride: aws.String(string(builtContent)),
 			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
 			SourceVersion:     aws.String(body.After),
 		})
