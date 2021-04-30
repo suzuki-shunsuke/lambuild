@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
+	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	wh "github.com/suzuki-shunsuke/lambuild/pkg/webhook"
 	"github.com/suzuki-shunsuke/matchfile-parser/matchfile"
@@ -53,6 +54,48 @@ func (handler *Handler) getHook(webhook wh.Webhook, body wh.Body, repo config.Re
 		}
 	}
 	return config.Hook{}, false, nil
+}
+
+func (handler *Handler) filter(filt bspec.LambuildFilter, webhook wh.Webhook, body wh.Body, changedFiles, labels []string) (bool, error) {
+	if len(filt.Event) != 0 {
+		matched := false
+		for _, ev := range filt.Event {
+			if ev == webhook.Headers.Event {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false, nil
+		}
+	}
+	if filt.File != "" {
+		cond, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(filt.File), "\n"))
+		if err != nil {
+			return false, err
+		}
+		f, err := handler.MatchfileParser.Match(changedFiles, cond)
+		if err != nil {
+			return false, err
+		}
+		if !f {
+			return false, nil
+		}
+	}
+	if filt.Label != "" {
+		cond, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(filt.Label), "\n"))
+		if err != nil {
+			return false, err
+		}
+		f, err := handler.MatchfileParser.Match(labels, cond)
+		if err != nil {
+			return false, err
+		}
+		if !f {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
@@ -102,7 +145,21 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		return fmt.Errorf("get a content: %w", err)
 	}
 
+	// TODO get pull request info
+
 	// TODO generate buildspec
+	buildspec := bspec.Buildspec{}
+	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
+		return fmt.Errorf("unmarshal a buildspec: %w", err)
+	}
+	graphElems := []bspec.GraphElement{}
+	// for _, graphElem := range buildspec.Batch.BuildGraph {
+	// 	// TODO filter
+	// }
+	if len(graphElems) == 0 {
+		logE.Info("no graph element is run")
+		return nil
+	}
 
 	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 		BuildspecOverride: aws.String(content),

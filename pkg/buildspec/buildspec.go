@@ -1,5 +1,17 @@
 package buildspec
 
+type Lambuild struct {
+	Filter []LambuildFilter
+}
+
+type LambuildFilter struct {
+	Event  []string
+	File   string
+	Label  string
+	Ref    string
+	Author string
+}
+
 type Buildspec struct {
 	Version string `json:"version"`
 	Env     Env    `json:"env"`
@@ -18,6 +30,7 @@ type GraphElement struct {
 	Env           GraphEnv `json:"env"`
 	DebugSession  bool     `json:"debug-session" yaml:"debug-session"`
 	IgnoreFailure bool     `json:"ignore-failure" yaml:"ignore-failure"`
+	Lambuild      Lambuild
 }
 
 type GraphEnv struct {
