@@ -13,44 +13,44 @@ type LambuildFilter struct {
 }
 
 type Buildspec struct {
-	Version float64 `json:"version"`
-	Env     Env     `json:"env"`
-	Phases  Phases  `json:"phases"`
-	Batch   Batch   `json:"batch"`
+	Version float64 `yaml:"version"`
+	Env     Env     `yaml:",omitempty"`
+	Phases  Phases  `yaml:",omitempty"`
+	Batch   Batch   `yaml:",omitempty"`
 }
 
 type Batch struct {
-	BuildGraph []GraphElement `json:"build-graph" yaml:"build-graph"`
+	BuildGraph []GraphElement `yaml:"build-graph,omitempty"`
 }
 
 type GraphElement struct {
-	Identifier    string   `json:"identifier"`
-	Buildspec     string   `json:"buildspec"`
-	DependOn      []string `json:"depend-on" yaml:"depend-on"`
-	Env           GraphEnv `json:"env"`
-	DebugSession  bool     `json:"debug-session" yaml:"debug-session"`
-	IgnoreFailure bool     `json:"ignore-failure" yaml:"ignore-failure"`
-	Lambuild      Lambuild `json:"lambuild,omitempty" yaml:"lambuild,omitempty"`
+	Identifier    string
+	Buildspec     string   `yaml:",omitempty"`
+	DependOn      []string `yaml:"depend-on,omitempty"`
+	Env           GraphEnv `yaml:",omitempty"`
+	DebugSession  bool     `yaml:"debug-session,omitempty"`
+	IgnoreFailure bool     `yaml:"ignore-failure,omitempty"`
+	Lambuild      Lambuild `yaml:"lambuild,omitempty"`
 }
 
 type GraphEnv struct {
-	ComputeType    string            `json:"compute-type" yaml:"compute-type"`
-	Image          string            `json:"image"`
-	Type           string            `json:"type"`
-	Variables      map[string]string `json:"variables"`
-	PrivilegedMode bool              `json:"privileged-mode" yaml:"privileged-mode"`
+	ComputeType    string            `yaml:"compute-type,omitempty"`
+	Image          string            `yaml:",omitempty"`
+	Type           string            `yaml:",omitempty"`
+	Variables      map[string]string `yaml:",omitempty"`
+	PrivilegedMode bool              `yaml:"privileged-mode,omitempty"`
 }
 
 type Env struct {
-	GitCredentialHelper string            `json:"git-credential-helper" yaml:"git-credential-helper"`
-	SecretsManager      map[string]string `json:"secrets-manager" yaml:"secrets-manager"`
-	Variables           map[string]string `json:"variables"`
+	GitCredentialHelper string            `yaml:"git-credential-helper,omitempty"`
+	SecretsManager      map[string]string `yaml:"secrets-manager,omitempty"`
+	Variables           map[string]string `yaml:",omitempty"`
 }
 
 type Phases struct {
-	Build Phase `json:"build"`
+	Build Phase `yaml:",omitempty"`
 }
 
 type Phase struct {
-	Commands []string `json:"commands"`
+	Commands []string `yaml:",omiempty"`
 }

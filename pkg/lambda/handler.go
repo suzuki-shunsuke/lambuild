@@ -150,25 +150,38 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		return nil
 	}
 
-	// TODO handler length 1
-
-	builtContent, err := yaml.Marshal(handler.generateBuildspec(buildspec, graphElems))
-	if err != nil {
-		return err
+	if len(graphElems) == 1 {
+		content = graphElems[0].Buildspec
+		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, &codebuild.StartBuildInput{
+			BuildspecOverride: aws.String(content),
+			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
+			SourceVersion:     aws.String(body.After),
+		})
+		if err != nil {
+			return fmt.Errorf("start a batch build: %w", err)
+		}
+		logE.WithFields(logrus.Fields{
+			"build_arn": *buildOut.Build.Arn,
+		}).Info("start a build")
+	} else {
+		builtContent, err := yaml.Marshal(handler.generateBuildspec(buildspec, graphElems))
+		if err != nil {
+			return err
+		}
+		content = string(builtContent)
+		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
+			BuildspecOverride: aws.String(content),
+			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
+			SourceVersion:     aws.String(body.After),
+		})
+		if err != nil {
+			return fmt.Errorf("start a batch build: %w", err)
+		}
+		logE.WithFields(logrus.Fields{
+			"build_arn": *buildOut.BuildBatch.Arn,
+		}).Info("start a batch build")
 	}
-	content = string(builtContent)
 
-	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-		BuildspecOverride: aws.String(content),
-		ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-		SourceVersion:     aws.String(body.After),
-	})
-	if err != nil {
-		return fmt.Errorf("start a batch build: %w", err)
-	}
-	logE.WithFields(logrus.Fields{
-		"build_arn": *buildOut.BuildBatch.Arn,
-	}).Info("start a build")
 	return nil
 }
 
