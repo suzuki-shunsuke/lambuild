@@ -15,6 +15,7 @@ import (
 	"github.com/google/go-github/v35/github"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	wh "github.com/suzuki-shunsuke/lambuild/pkg/webhook"
+	"github.com/suzuki-shunsuke/matchfile-parser/matchfile"
 	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v2"
 )
@@ -30,6 +31,7 @@ type Handler struct {
 	GitHub               *github.Client
 	CodeBuild            *codebuild.CodeBuild
 	S3Uploader           *s3manager.Uploader
+	MatchfileParser      *matchfile.Parser
 }
 
 func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
@@ -51,7 +53,13 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 			if hook.Event != webhook.Headers.Event {
 				continue
 			}
-			// TODO filter refs
+			f, err := handler.MatchfileParser.Match([]string{body.Ref}, hook.RefConditions)
+			if err != nil {
+				return err
+			}
+			if !f {
+				continue
+			}
 			// TODO get config from github
 			owner := strings.Split(body.Repository.FullName, "/")[0]
 			path := "lambuild.yaml"
@@ -113,6 +121,20 @@ func (handler *Handler) Init(ctx context.Context) error {
 	)))
 	handler.CodeBuild = codebuild.New(sess, aws.NewConfig().WithRegion(handler.Region))
 	handler.S3Uploader = s3manager.NewUploader(sess)
+
+	handler.MatchfileParser = matchfile.NewParser()
+	for i, repo := range cfg.Repositories {
+		for j, hook := range repo.Hooks {
+			rawConditions := strings.Split(strings.TrimSpace(hook.Refs), "\n")
+			conditions, err := handler.MatchfileParser.ParseConditions(rawConditions)
+			if err != nil {
+				return err
+			}
+			hook.RefConditions = conditions
+			repo.Hooks[j] = hook
+		}
+		cfg.Repositories[i] = repo
+	}
 
 	return nil
 }

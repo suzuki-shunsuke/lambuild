@@ -1,5 +1,9 @@
 package config
 
+import (
+	"github.com/suzuki-shunsuke/matchfile-parser/matchfile"
+)
+
 type Config struct {
 	Repositories []Repository
 }
@@ -15,7 +19,8 @@ type CodeBuild struct {
 }
 
 type Hook struct {
-	Event  string
-	Refs   string
-	Config string
+	Event         string
+	Refs          string
+	RefConditions []matchfile.Condition
+	Config        string
 }
