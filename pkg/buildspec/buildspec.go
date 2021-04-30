@@ -13,10 +13,10 @@ type LambuildFilter struct {
 }
 
 type Buildspec struct {
-	Version string `json:"version"`
-	Env     Env    `json:"env"`
-	Phases  Phases `json:"phases"`
-	Batch   Batch  `json:"batch"`
+	Version float64 `json:"version"`
+	Env     Env     `json:"env"`
+	Phases  Phases  `json:"phases"`
+	Batch   Batch   `json:"batch"`
 }
 
 type Batch struct {
