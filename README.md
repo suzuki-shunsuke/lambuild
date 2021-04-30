@@ -19,7 +19,6 @@ GitHub Webhook => API Gateway => Lambda => CodeBuild
   * HTTP API Gateway
   * Lambda Function
   * Systems Manager Parameter Store
-  * S3 Bucket
   * CodeBuild Project
 * Create GitHub Repository's Webhook
 * Add `lambuild.yaml` to target repositories
@@ -30,8 +29,7 @@ GitHub Webhook => API Gateway => Lambda => CodeBuild
 
 * CONFIG
 * REGION
-* BUILDSPEC_S3_BUCKET
-* BUILDSPEC_S3_KEY_PREFIX
+* LOG_LEVEL
 * SSM_PARAMETER_NAME_GITHUB_TOKEN
 * SSM_PARAMETER_NAME_WEBHOOK_SECRET
 
