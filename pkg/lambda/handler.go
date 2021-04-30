@@ -34,6 +34,31 @@ type Handler struct {
 	MatchfileParser      *matchfile.Parser
 }
 
+func (handler *Handler) getRepo(body wh.Body) (config.Repository, bool) {
+	for _, repo := range handler.Config.Repositories {
+		if repo.Name == body.Repository.FullName {
+			return repo, true
+		}
+	}
+	return config.Repository{}, false
+}
+
+func (handler *Handler) getHook(webhook wh.Webhook, body wh.Body, repo config.Repository) (config.Hook, bool, error) {
+	for _, hook := range repo.Hooks {
+		if hook.Event != webhook.Headers.Event {
+			continue
+		}
+		f, err := handler.MatchfileParser.Match([]string{body.Ref}, hook.RefConditions)
+		if err != nil {
+			return hook, false, err
+		}
+		if f {
+			return hook, true, nil
+		}
+	}
+	return config.Hook{}, false, nil
+}
+
 func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 	if err := github.ValidateSignature(webhook.Headers.Signature, []byte(webhook.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
 		// TODO return 400
@@ -45,55 +70,50 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		return err
 	}
 
-	for _, repo := range handler.Config.Repositories {
-		if repo.Name != body.Repository.FullName {
-			continue
-		}
-		for _, hook := range repo.Hooks {
-			if hook.Event != webhook.Headers.Event {
-				continue
-			}
-			f, err := handler.MatchfileParser.Match([]string{body.Ref}, hook.RefConditions)
-			if err != nil {
-				return err
-			}
-			if !f {
-				continue
-			}
-			// TODO get config from github
-			owner := strings.Split(body.Repository.FullName, "/")[0]
-			path := "lambuild.yaml"
-			file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, owner, body.Repository.Name, path, nil)
-			if err != nil {
-				// start build
-				return nil
-			}
-			content, err := file.GetContent()
-			if err != nil {
-				return fmt.Errorf("get a content: %w", err)
-			}
-			// TODO generate buildspec
-			buildspecKey := handler.BuildspecS3KeyPrefix + webhook.Headers.Delivery + "/buildspec.yml"
-			uploadOut, err := handler.S3Uploader.UploadWithContext(ctx, &s3manager.UploadInput{
-				Bucket: aws.String(handler.BuildspecS3Bucket),
-				Key:    aws.String(buildspecKey),
-				Body:   strings.NewReader(content),
-			})
-			if err != nil {
-				return fmt.Errorf("upload a buildspec: %w", err)
-			}
-			buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-				BuildspecOverride: aws.String(uploadOut.Location),
-				ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-				SourceVersion:     aws.String(body.After),
-			})
-			if err != nil {
-				return fmt.Errorf("start a batch build: %w", err)
-			}
-			log.Printf("start a build (repo: %s, arn: %s)", body.Repository.FullName, *buildOut.BuildBatch.Arn)
-			return nil
-		}
+	repo, f := handler.getRepo(body)
+	if !f {
+		return nil
 	}
+
+	hook, f, err := handler.getHook(webhook, body, repo)
+	if err != nil {
+		return err
+	}
+	if !f {
+		return nil
+	}
+
+	owner := strings.Split(body.Repository.FullName, "/")[0]
+	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, owner, body.Repository.Name, hook.Config, nil)
+	if err != nil {
+		// start build
+		return nil
+	}
+	content, err := file.GetContent()
+	if err != nil {
+		return fmt.Errorf("get a content: %w", err)
+	}
+
+	// TODO generate buildspec
+	buildspecKey := handler.BuildspecS3KeyPrefix + repo.CodeBuild.ProjectName + "/" + webhook.Headers.Delivery + "/buildspec.yml"
+	uploadOut, err := handler.S3Uploader.UploadWithContext(ctx, &s3manager.UploadInput{
+		Bucket: aws.String(handler.BuildspecS3Bucket),
+		Key:    aws.String(buildspecKey),
+		Body:   strings.NewReader(content),
+	})
+	if err != nil {
+		return fmt.Errorf("upload a buildspec: %w", err)
+	}
+
+	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
+		BuildspecOverride: aws.String(uploadOut.Location),
+		ProjectName:       aws.String(repo.CodeBuild.ProjectName),
+		SourceVersion:     aws.String(body.After),
+	})
+	if err != nil {
+		return fmt.Errorf("start a batch build: %w", err)
+	}
+	log.Printf("start a build (repo: %s, arn: %s)", body.Repository.FullName, *buildOut.BuildBatch.Arn)
 	return nil
 }
 
