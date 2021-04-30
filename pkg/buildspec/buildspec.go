@@ -30,7 +30,7 @@ type GraphElement struct {
 	Env           GraphEnv `json:"env"`
 	DebugSession  bool     `json:"debug-session" yaml:"debug-session"`
 	IgnoreFailure bool     `json:"ignore-failure" yaml:"ignore-failure"`
-	Lambuild      Lambuild
+	Lambuild      Lambuild `json:"lambuild,omitempty" yaml:"lambuild,omitempty"`
 }
 
 type GraphEnv struct {

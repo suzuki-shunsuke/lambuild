@@ -56,48 +56,6 @@ func (handler *Handler) getHook(webhook wh.Webhook, body wh.Body, repo config.Re
 	return config.Hook{}, false, nil
 }
 
-func (handler *Handler) filter(filt bspec.LambuildFilter, webhook wh.Webhook, body wh.Body, changedFiles, labels []string) (bool, error) {
-	if len(filt.Event) != 0 {
-		matched := false
-		for _, ev := range filt.Event {
-			if ev == webhook.Headers.Event {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return false, nil
-		}
-	}
-	if filt.File != "" {
-		cond, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(filt.File), "\n"))
-		if err != nil {
-			return false, err
-		}
-		f, err := handler.MatchfileParser.Match(changedFiles, cond)
-		if err != nil {
-			return false, err
-		}
-		if !f {
-			return false, nil
-		}
-	}
-	if filt.Label != "" {
-		cond, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(filt.Label), "\n"))
-		if err != nil {
-			return false, err
-		}
-		f, err := handler.MatchfileParser.Match(labels, cond)
-		if err != nil {
-			return false, err
-		}
-		if !f {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
 func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 	if err := github.ValidateSignature(webhook.Headers.Signature, []byte(webhook.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
 		// TODO return 400
@@ -145,21 +103,60 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		return fmt.Errorf("get a content: %w", err)
 	}
 
-	// TODO get pull request info
+	pullRequest := PullRequest{}
 
-	// TODO generate buildspec
+	prNum, err := getPRNumber(ctx, owner, body.Repository.Name, body.After, handler.GitHub)
+	if err != nil {
+		return err
+	}
+	if prNum != 0 {
+		pullRequest.Number = prNum
+		pr, _, err := handler.GitHub.PullRequests.Get(ctx, owner, body.Repository.Name, prNum)
+		if err != nil {
+			return fmt.Errorf("get a pull request: %w", err)
+		}
+		pullRequest.PullRequest = pr
+
+		pullRequest.Labels = extractLabelNames(pr.Labels)
+
+		files, _, err := getPRFiles(ctx, handler.GitHub, owner, body.Repository.Name, prNum, pr.GetChangedFiles())
+		if err != nil {
+			return fmt.Errorf("get pull request files: %w", err)
+		}
+		pullRequest.Files = files
+
+		pullRequest.FileNames = extractPRFileNames(files)
+	}
+
 	buildspec := bspec.Buildspec{}
 	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
 		return fmt.Errorf("unmarshal a buildspec: %w", err)
 	}
 	graphElems := []bspec.GraphElement{}
-	// for _, graphElem := range buildspec.Batch.BuildGraph {
-	// 	// TODO filter
-	// }
+	for _, graphElem := range buildspec.Batch.BuildGraph {
+		for _, filt := range graphElem.Lambuild.Filter {
+			f, err := handler.filter(filt, webhook, body, pullRequest)
+			if err != nil {
+				return err
+			}
+			if f {
+				graphElems = append(graphElems, graphElem)
+				break
+			}
+		}
+	}
 	if len(graphElems) == 0 {
 		logE.Info("no graph element is run")
 		return nil
 	}
+
+	// TODO handler length 1
+
+	builtContent, err := yaml.Marshal(handler.generateBuildspec(buildspec, graphElems))
+	if err != nil {
+		return err
+	}
+	content = string(builtContent)
 
 	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 		BuildspecOverride: aws.String(content),
