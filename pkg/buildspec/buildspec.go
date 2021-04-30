@@ -5,11 +5,12 @@ type Lambuild struct {
 }
 
 type LambuildFilter struct {
-	Event  []string
-	File   string
-	Label  string
-	Ref    string
-	Author string
+	Event   []string
+	File    string
+	Label   string
+	Ref     string
+	BaseRef string `yaml:"base-ref"`
+	Author  string
 }
 
 type Buildspec struct {

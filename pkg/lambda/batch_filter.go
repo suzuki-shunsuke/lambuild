@@ -7,6 +7,24 @@ import (
 	wh "github.com/suzuki-shunsuke/lambuild/pkg/webhook"
 )
 
+func (handler *Handler) filterByMatchfile(rawCondition string, arr []string) (bool, error) {
+	if rawCondition == "" {
+		return true, nil
+	}
+	cond, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(rawCondition), "\n"))
+	if err != nil {
+		return false, err
+	}
+	f, err := handler.MatchfileParser.Match(arr, cond)
+	if err != nil {
+		return false, err
+	}
+	if !f {
+		return false, nil
+	}
+	return true, nil
+}
+
 func (handler *Handler) filter(filt bspec.LambuildFilter, webhook wh.Webhook, body wh.Body, pr PullRequest) (bool, error) {
 	if len(filt.Event) != 0 {
 		matched := false
@@ -20,32 +38,21 @@ func (handler *Handler) filter(filt bspec.LambuildFilter, webhook wh.Webhook, bo
 			return false, nil
 		}
 	}
+	if f, err := handler.filterByMatchfile(filt.Ref, []string{body.Ref}); err != nil || !f {
+		return false, err
+	}
 	if pr.Number != 0 {
-		if filt.File != "" {
-			cond, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(filt.File), "\n"))
-			if err != nil {
-				return false, err
-			}
-			f, err := handler.MatchfileParser.Match(pr.FileNames, cond)
-			if err != nil {
-				return false, err
-			}
-			if !f {
-				return false, nil
-			}
+		if f, err := handler.filterByMatchfile(filt.File, pr.FileNames); err != nil || !f {
+			return false, err
 		}
-		if filt.Label != "" {
-			cond, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(filt.Label), "\n"))
-			if err != nil {
-				return false, err
-			}
-			f, err := handler.MatchfileParser.Match(pr.Labels, cond)
-			if err != nil {
-				return false, err
-			}
-			if !f {
-				return false, nil
-			}
+		if f, err := handler.filterByMatchfile(filt.Label, pr.Labels); err != nil || !f {
+			return false, err
+		}
+		if f, err := handler.filterByMatchfile(filt.Author, []string{pr.PullRequest.GetUser().GetLogin()}); err != nil || !f {
+			return false, err
+		}
+		if f, err := handler.filterByMatchfile(filt.BaseRef, []string{pr.PullRequest.Base.GetRef()}); err != nil || !f {
+			return false, err
 		}
 	}
 	return true, nil
