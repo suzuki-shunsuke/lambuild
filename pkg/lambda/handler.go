@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -94,13 +95,31 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 	owner := strings.Split(body.Repository.FullName, "/")[0]
 	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, owner, body.Repository.Name, hook.Config, &github.RepositoryContentGetOptions{Ref: body.Ref})
 	if err != nil {
-		// start build
 		logE.WithError(err).Debug("no content is found")
 		return nil
 	}
 	content, err := file.GetContent()
 	if err != nil {
 		return fmt.Errorf("get a content: %w", err)
+	}
+
+	envs := []*codebuild.EnvironmentVariable{
+		{
+			Name:  aws.String("LAMBUILD_WEBHOOK_BODY"),
+			Value: aws.String(webhook.Body),
+		},
+		{
+			Name:  aws.String("LAMBUILD_WEBHOOK_EVENT"),
+			Value: aws.String(webhook.Headers.Event),
+		},
+		{
+			Name:  aws.String("LAMBUILD_WEBHOOK_DELIVERY"),
+			Value: aws.String(webhook.Headers.Delivery),
+		},
+		{
+			Name:  aws.String("LAMBUILD_HEAD_COMMIT_MSG"),
+			Value: aws.String(body.HeadCommit.Message),
+		},
 	}
 
 	pullRequest := PullRequest{}
@@ -126,6 +145,17 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		pullRequest.Files = files
 
 		pullRequest.FileNames = extractPRFileNames(files)
+
+		envs = append(envs, &codebuild.EnvironmentVariable{
+			Name:  aws.String("LAMBUILD_PR_NUMBER"),
+			Value: aws.String(strconv.Itoa(prNum)),
+		}, &codebuild.EnvironmentVariable{
+			Name:  aws.String("LAMBUILD_PR_AUTHOR"),
+			Value: aws.String(pr.GetUser().GetLogin()),
+		}, &codebuild.EnvironmentVariable{
+			Name:  aws.String("LAMBUILD_PR_BASE_REF"),
+			Value: aws.String(pr.GetBase().GetRef()),
+		})
 	}
 
 	buildspec := bspec.Buildspec{}
@@ -161,7 +191,6 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 			input.DebugSessionEnabled = aws.Bool(true)
 		}
 
-		envs := make([]*codebuild.EnvironmentVariable, 0, len(graphElem.Env.Variables))
 		for k, v := range graphElem.Env.Variables {
 			envs = append(envs, &codebuild.EnvironmentVariable{
 				Name:  aws.String(k),
@@ -195,9 +224,10 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 			return err
 		}
 		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-			BuildspecOverride: aws.String(string(builtContent)),
-			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:     aws.String(body.After),
+			BuildspecOverride:            aws.String(string(builtContent)),
+			ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
+			SourceVersion:                aws.String(body.After),
+			EnvironmentVariablesOverride: envs,
 		})
 		if err != nil {
 			return fmt.Errorf("start a batch build: %w", err)
