@@ -20,7 +20,7 @@ type Buildspec struct {
 }
 
 type Batch struct {
-	BuildGraph []GraphElement `json:"build-graph"`
+	BuildGraph []GraphElement `json:"build-graph" yaml:"build-graph"`
 }
 
 type GraphElement struct {
