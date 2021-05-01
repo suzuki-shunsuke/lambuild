@@ -2,7 +2,6 @@ package lambda
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -32,23 +31,79 @@ type Handler struct {
 	MatchfileParser *matchfile.Parser
 }
 
-func (handler *Handler) getRepo(body wh.Body) (config.Repository, bool) {
+func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
 	for _, repo := range handler.Config.Repositories {
-		if repo.Name == body.Repository.FullName {
+		if repo.Name == repoName {
 			return repo, true
 		}
 	}
 	return config.Repository{}, false
 }
 
-func (handler *Handler) getHook(webhook wh.Webhook, body wh.Body, repo config.Repository) (config.Hook, bool, error) {
-	for _, hook := range repo.Hooks {
-		if hook.Event != webhook.Headers.Event {
-			continue
+func (handler *Handler) matchHook(webhook wh.Webhook, event wh.Event, repo config.Repository, hook config.Hook) (bool, error) {
+	if len(hook.Event) != 0 {
+		eventMatched := false
+		for _, ev := range hook.Event {
+			if ev == webhook.Headers.Event {
+				eventMatched = true
+				break
+			}
 		}
-		f, err := handler.MatchfileParser.Match([]string{body.Ref}, hook.RefConditions)
+		if !eventMatched {
+			return false, nil
+		}
+	}
+
+	if hook.Ref != "" {
+		f, err := handler.MatchfileParser.Match([]string{event.Ref}, hook.RefConditions)
 		if err != nil {
-			return hook, false, err
+			return false, err
+		}
+		if !f {
+			return false, nil
+		}
+	}
+
+	if hook.BaseRef != "" {
+		f, err := handler.MatchfileParser.Match([]string{event.BaseRef}, hook.BaseRefConditions)
+		if err != nil {
+			return false, err
+		}
+		if !f {
+			return false, nil
+		}
+	}
+
+	if event.PRAuthor != "" && hook.Author != "" {
+		f, err := handler.MatchfileParser.Match([]string{event.PRAuthor}, hook.AuthorConditions)
+		if err != nil {
+			return false, err
+		}
+		if !f {
+			return false, nil
+		}
+	}
+
+	if webhook.Headers.Event == "pull_request" && hook.Label != "" {
+		f, err := handler.MatchfileParser.Match(event.Labels, hook.LabelConditions)
+		if err != nil {
+			return false, err
+		}
+		if !(hook.NoLabel && len(event.Labels) == 0 && !f) {
+			if !f {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
+}
+
+func (handler *Handler) getHook(webhook wh.Webhook, event wh.Event, repo config.Repository) (config.Hook, bool, error) {
+	for _, hook := range repo.Hooks {
+		f, err := handler.matchHook(webhook, event, repo, hook)
+		if err != nil {
+			return config.Hook{}, false, err
 		}
 		if f {
 			return hook, true, nil
@@ -57,29 +112,20 @@ func (handler *Handler) getHook(webhook wh.Webhook, body wh.Body, repo config.Re
 	return config.Hook{}, false, nil
 }
 
-func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
-	if err := github.ValidateSignature(webhook.Headers.Signature, []byte(webhook.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
-		// TODO return 400
-		fmt.Println(err)
-		return nil
-	}
-	body := wh.Body{}
-	if err := json.Unmarshal([]byte(webhook.Body), &body); err != nil {
-		return err
-	}
-
+func (handler *Handler) handleEvent(ctx context.Context, webhook wh.Webhook, event wh.Event) error {
+	event.RepoOwner = strings.Split(event.RepoFullName, "/")[0]
 	logE := logrus.WithFields(logrus.Fields{
-		"repo": body.Repository.FullName,
-		"ref":  body.Ref,
+		"repo": event.RepoFullName,
+		"ref":  event.Ref,
 	})
 
-	repo, f := handler.getRepo(body)
+	repo, f := handler.getRepo(event.RepoFullName)
 	if !f {
 		logE.Debug("no repo matches")
 		return nil
 	}
 
-	hook, f, err := handler.getHook(webhook, body, repo)
+	hook, f, err := handler.getHook(webhook, event, repo)
 	if err != nil {
 		return err
 	}
@@ -92,8 +138,15 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		"event":  hook.Event,
 	})
 
-	owner := strings.Split(body.Repository.FullName, "/")[0]
-	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, owner, body.Repository.Name, hook.Config, &github.RepositoryContentGetOptions{Ref: body.Ref})
+	if event.HeadCommitMessage == "" {
+		commit, _, err := handler.GitHub.Git.GetCommit(ctx, event.RepoOwner, event.RepoName, event.SHA)
+		if err != nil {
+			return fmt.Errorf("get a commit: %w", err)
+		}
+		event.HeadCommitMessage = commit.GetMessage()
+	}
+
+	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, event.RepoOwner, event.RepoName, hook.Config, &github.RepositoryContentGetOptions{Ref: event.Ref})
 	if err != nil {
 		logE.WithError(err).Debug("no content is found")
 		return nil
@@ -118,43 +171,45 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		},
 		{
 			Name:  aws.String("LAMBUILD_HEAD_COMMIT_MSG"),
-			Value: aws.String(body.HeadCommit.Message),
+			Value: aws.String(event.HeadCommitMessage),
 		},
 	}
 
-	pullRequest := PullRequest{}
-
-	prNum, err := getPRNumber(ctx, owner, body.Repository.Name, body.After, handler.GitHub)
-	if err != nil {
-		return err
-	}
-	if prNum != 0 {
-		pullRequest.Number = prNum
-		pr, _, err := handler.GitHub.PullRequests.Get(ctx, owner, body.Repository.Name, prNum)
+	if event.PRNum == 0 {
+		prNum, err := getPRNumber(ctx, event.RepoOwner, event.RepoName, event.SHA, handler.GitHub)
 		if err != nil {
-			return fmt.Errorf("get a pull request: %w", err)
+			return err
 		}
-		pullRequest.PullRequest = pr
+		event.PRNum = prNum
+	}
 
-		pullRequest.Labels = extractLabelNames(pr.Labels)
+	if event.PRNum != 0 {
+		if event.PRAuthor == "" {
+			pr, _, err := handler.GitHub.PullRequests.Get(ctx, event.RepoOwner, event.RepoName, event.PRNum)
+			if err != nil {
+				return fmt.Errorf("get a pull request: %w", err)
+			}
+			handler.setPullRequest(&event, pr)
+		}
 
-		files, _, err := getPRFiles(ctx, handler.GitHub, owner, body.Repository.Name, prNum, pr.GetChangedFiles())
+		files, _, err := getPRFiles(ctx, handler.GitHub, event.RepoOwner, event.RepoName, event.PRNum, event.ChangedFiles)
 		if err != nil {
 			return fmt.Errorf("get pull request files: %w", err)
 		}
-		pullRequest.Files = files
-
-		pullRequest.FileNames = extractPRFileNames(files)
+		event.ChangedFileNames = extractPRFileNames(files)
 
 		envs = append(envs, &codebuild.EnvironmentVariable{
 			Name:  aws.String("LAMBUILD_PR_NUMBER"),
-			Value: aws.String(strconv.Itoa(prNum)),
+			Value: aws.String(strconv.Itoa(event.PRNum)),
 		}, &codebuild.EnvironmentVariable{
 			Name:  aws.String("LAMBUILD_PR_AUTHOR"),
-			Value: aws.String(pr.GetUser().GetLogin()),
+			Value: aws.String(event.PRAuthor),
 		}, &codebuild.EnvironmentVariable{
 			Name:  aws.String("LAMBUILD_PR_BASE_REF"),
-			Value: aws.String(pr.GetBase().GetRef()),
+			Value: aws.String(event.BaseRef),
+		}, &codebuild.EnvironmentVariable{
+			Name:  aws.String("LAMBUILD_PR_HEAD_REF"),
+			Value: aws.String(event.HeadRef),
 		})
 	}
 
@@ -165,7 +220,7 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 	graphElems := []bspec.GraphElement{}
 	for _, graphElem := range buildspec.Batch.BuildGraph {
 		for _, filt := range graphElem.Lambuild.Filter {
-			f, err := handler.filter(filt, webhook, body, pullRequest)
+			f, err := handler.filter(filt, webhook, event)
 			if err != nil {
 				return err
 			}
@@ -185,7 +240,7 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		input := &codebuild.StartBuildInput{
 			BuildspecOverride: aws.String(graphElem.Buildspec),
 			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:     aws.String(body.After),
+			SourceVersion:     aws.String(event.SHA),
 		}
 		if graphElem.DebugSession {
 			input.DebugSessionEnabled = aws.Bool(true)
@@ -226,7 +281,7 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 			BuildspecOverride:            aws.String(string(builtContent)),
 			ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:                aws.String(body.After),
+			SourceVersion:                aws.String(event.SHA),
 			EnvironmentVariablesOverride: envs,
 		})
 		if err != nil {
@@ -236,8 +291,66 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 			"build_arn": *buildOut.BuildBatch.Arn,
 		}).Info("start a batch build")
 	}
-
 	return nil
+}
+
+func (handler *Handler) setPullRequest(event *wh.Event, pr *github.PullRequest) {
+	event.Ref = pr.GetHead().GetRef()
+	event.Labels = extractLabelNames(pr.Labels)
+	event.PRAuthor = pr.GetUser().GetLogin()
+	event.ChangedFiles = pr.GetChangedFiles()
+	event.BaseRef = pr.GetBase().GetRef()
+	event.HeadRef = pr.GetHead().GetRef()
+}
+
+func (handler *Handler) setRepo(event *wh.Event, repo *github.Repository) {
+	event.RepoFullName = repo.GetFullName()
+	event.RepoName = repo.GetName()
+}
+
+func (handler *Handler) handlePushEvent(ctx context.Context, webhook wh.Webhook, event *github.PushEvent) error {
+	repo := event.GetRepo()
+	ev := wh.Event{
+		RepoFullName:      repo.GetFullName(),
+		RepoName:          repo.GetName(),
+		Ref:               event.GetRef(),
+		SHA:               event.GetAfter(),
+		HeadCommitMessage: event.GetHeadCommit().GetMessage(),
+	}
+	return handler.handleEvent(ctx, webhook, ev)
+}
+
+func (handler *Handler) handlePREvent(ctx context.Context, webhook wh.Webhook, event *github.PullRequestEvent) error {
+	repo := event.GetRepo()
+	pr := event.GetPullRequest()
+	ev := wh.Event{
+		SHA:   pr.GetHead().GetSHA(),
+		PRNum: pr.GetNumber(),
+	}
+	handler.setRepo(&ev, repo)
+	handler.setPullRequest(&ev, pr)
+	return handler.handleEvent(ctx, webhook, ev)
+}
+
+func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
+	if err := github.ValidateSignature(webhook.Headers.Signature, []byte(webhook.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
+		// TODO return 400
+		fmt.Println(err)
+		return nil
+	}
+	body, err := github.ParseWebHook(webhook.Headers.Event, []byte(webhook.Body))
+	if err != nil {
+		return fmt.Errorf("parse a webhook payload: %w", err)
+	}
+
+	switch webhook.Headers.Event {
+	case "push":
+		return handler.handlePushEvent(ctx, webhook, body.(*github.PushEvent))
+	case "pull_request":
+		return handler.handlePREvent(ctx, webhook, body.(*github.PullRequestEvent))
+	default:
+		return nil
+	}
 }
 
 func (handler *Handler) Init(ctx context.Context) error {
@@ -276,12 +389,30 @@ func (handler *Handler) Init(ctx context.Context) error {
 	handler.MatchfileParser = matchfile.NewParser()
 	for i, repo := range cfg.Repositories {
 		for j, hook := range repo.Hooks {
-			rawConditions := strings.Split(strings.TrimSpace(hook.Refs), "\n")
-			conditions, err := handler.MatchfileParser.ParseConditions(rawConditions)
+			conditions, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.Ref), "\n"))
 			if err != nil {
 				return err
 			}
 			hook.RefConditions = conditions
+
+			conditions, err = handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.BaseRef), "\n"))
+			if err != nil {
+				return err
+			}
+			hook.BaseRefConditions = conditions
+
+			conditions, err = handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.Label), "\n"))
+			if err != nil {
+				return err
+			}
+			hook.LabelConditions = conditions
+
+			conditions, err = handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.Author), "\n"))
+			if err != nil {
+				return err
+			}
+			hook.AuthorConditions = conditions
+
 			repo.Hooks[j] = hook
 		}
 		cfg.Repositories[i] = repo

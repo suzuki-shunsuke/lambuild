@@ -25,7 +25,7 @@ func (handler *Handler) filterByMatchfile(rawCondition string, arr []string) (bo
 	return true, nil
 }
 
-func (handler *Handler) filter(filt bspec.LambuildFilter, webhook wh.Webhook, body wh.Body, pr PullRequest) (bool, error) {
+func (handler *Handler) filter(filt bspec.LambuildFilter, webhook wh.Webhook, event wh.Event) (bool, error) {
 	if len(filt.Event) != 0 {
 		matched := false
 		for _, ev := range filt.Event {
@@ -38,20 +38,20 @@ func (handler *Handler) filter(filt bspec.LambuildFilter, webhook wh.Webhook, bo
 			return false, nil
 		}
 	}
-	if f, err := handler.filterByMatchfile(filt.Ref, []string{body.Ref}); err != nil || !f {
+	if f, err := handler.filterByMatchfile(filt.Ref, []string{event.Ref}); err != nil || !f {
 		return false, err
 	}
-	if pr.Number != 0 {
-		if f, err := handler.filterByMatchfile(filt.File, pr.FileNames); err != nil || !f {
+	if event.PRNum != 0 {
+		if f, err := handler.filterByMatchfile(filt.File, event.ChangedFileNames); err != nil || !f {
 			return false, err
 		}
-		if f, err := handler.filterByMatchfile(filt.Label, pr.Labels); err != nil || !f {
+		if f, err := handler.filterByMatchfile(filt.Label, event.Labels); err != nil || !f {
 			return false, err
 		}
-		if f, err := handler.filterByMatchfile(filt.Author, []string{pr.PullRequest.GetUser().GetLogin()}); err != nil || !f {
+		if f, err := handler.filterByMatchfile(filt.Author, []string{event.PRAuthor}); err != nil || !f {
 			return false, err
 		}
-		if f, err := handler.filterByMatchfile(filt.BaseRef, []string{pr.PullRequest.Base.GetRef()}); err != nil || !f {
+		if f, err := handler.filterByMatchfile(filt.BaseRef, []string{event.BaseRef}); err != nil || !f {
 			return false, err
 		}
 	}

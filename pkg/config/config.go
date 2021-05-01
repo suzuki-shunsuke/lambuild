@@ -15,12 +15,19 @@ type Repository struct {
 }
 
 type CodeBuild struct {
-	ProjectName string `yaml:"project_name"`
+	ProjectName string `yaml:"project-name"`
 }
 
 type Hook struct {
-	Event         string
-	Refs          string
-	RefConditions []matchfile.Condition
-	Config        string
+	Event             []string
+	Ref               string
+	BaseRef           string `yaml:"base-ref"`
+	Author            string
+	Label             string
+	RefConditions     []matchfile.Condition `yaml:"-"`
+	BaseRefConditions []matchfile.Condition `yaml:"-"`
+	AuthorConditions  []matchfile.Condition `yaml:"-"`
+	LabelConditions   []matchfile.Condition `yaml:"-"`
+	NoLabel           bool                  `yaml:"no-label"`
+	Config            string
 }
