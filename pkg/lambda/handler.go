@@ -2,6 +2,7 @@ package lambda
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -356,20 +357,43 @@ func (handler *Handler) Do(ctx context.Context, webhook wh.Webhook) error {
 func (handler *Handler) Init(ctx context.Context) error {
 	cfg := config.Config{}
 	configRaw := os.Getenv("CONFIG")
-	if err := yaml.Unmarshal([]byte(configRaw), &cfg); err != nil {
-		return err
+	if configRaw == "" {
+		return errors.New("the environment variable 'CONFIG' is required")
 	}
-	handler.Config = cfg
-	handler.Region = os.Getenv("REGION")
-	sess := session.Must(session.NewSession())
-	if secretNameGitHubToken := os.Getenv("SSM_PARAMETER_NAME_GITHUB_TOKEN"); secretNameGitHubToken != "" {
-		if secretNameWebhookSecret := os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET"); secretNameWebhookSecret != "" {
-			if err := handler.readSecretFromSSM(ctx, sess, secretNameGitHubToken, secretNameWebhookSecret); err != nil {
-				return err
-			}
+	if err := yaml.Unmarshal([]byte(configRaw), &cfg); err != nil {
+		return fmt.Errorf("parse the environment variable 'CONFIG' as YAML: %w", err)
+	}
+
+	if len(cfg.Repositories) == 0 {
+		return errors.New(`the configuration 'repositories' is required`)
+	}
+	for _, repo := range cfg.Repositories {
+		if repo.Name == "" {
+			return errors.New(`the repository 'name' is required`)
+		}
+		if repo.CodeBuild.ProjectName == "" {
+			return fmt.Errorf(`'project-name' is required (repo: %s)`, repo.Name)
 		}
 	}
 
+	handler.Config = cfg
+	handler.Region = os.Getenv("REGION")
+	if handler.Region == "" {
+		return errors.New("the environment variable 'REGION' is required")
+	}
+	sess := session.Must(session.NewSession())
+	secretNameGitHubToken := os.Getenv("SSM_PARAMETER_NAME_GITHUB_TOKEN")
+	if secretNameGitHubToken == "" {
+		return errors.New("the environment variable 'SSM_PARAMETER_NAME_GITHUB_TOKEN' is required")
+	}
+	secretNameWebhookSecret := os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET")
+	if secretNameWebhookSecret != "" {
+		return errors.New("the environment variable 'SSM_PARAMETER_NAME_WEBHOOK_SECRET' is required")
+	}
+
+	if err := handler.readSecretFromSSM(ctx, sess, secretNameGitHubToken, secretNameWebhookSecret); err != nil {
+		return err
+	}
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
 		lvl, err := logrus.ParseLevel(logLevel)
 		if err != nil {
@@ -389,6 +413,12 @@ func (handler *Handler) Init(ctx context.Context) error {
 	handler.MatchfileParser = matchfile.NewParser()
 	for i, repo := range cfg.Repositories {
 		for j, hook := range repo.Hooks {
+			for _, ev := range hook.Event {
+				if ev != "push" && ev != "pull_request" {
+					return fmt.Errorf(`hook.event is invalid: %s`, ev)
+				}
+			}
+
 			conditions, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.Ref), "\n"))
 			if err != nil {
 				return err
