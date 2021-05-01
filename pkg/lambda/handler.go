@@ -157,6 +157,11 @@ func (handler *Handler) handleEvent(ctx context.Context, webhook wh.Webhook, eve
 		return fmt.Errorf("get a content: %w", err)
 	}
 
+	buildspec := bspec.Buildspec{}
+	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
+		return fmt.Errorf("unmarshal a buildspec: %w", err)
+	}
+
 	envs := []*codebuild.EnvironmentVariable{
 		{
 			Name:  aws.String("LAMBUILD_WEBHOOK_BODY"),
@@ -214,84 +219,16 @@ func (handler *Handler) handleEvent(ctx context.Context, webhook wh.Webhook, eve
 		})
 	}
 
-	buildspec := bspec.Buildspec{}
-	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
-		return fmt.Errorf("unmarshal a buildspec: %w", err)
+	if len(buildspec.Batch.BuildGraph) != 0 {
+		return handler.handleGraph(ctx, logE, event, webhook, buildspec, repo, envs)
 	}
-	graphElems := []bspec.GraphElement{}
-	for _, graphElem := range buildspec.Batch.BuildGraph {
-		for _, filt := range graphElem.Lambuild.Filter {
-			f, err := handler.filter(filt, webhook, event)
-			if err != nil {
-				return err
-			}
-			if f {
-				graphElems = append(graphElems, graphElem)
-				break
-			}
-		}
+	if len(buildspec.Batch.BuildList) != 0 {
+		return handler.handleList(ctx, logE, event, webhook, buildspec, repo, envs)
 	}
-	if len(graphElems) == 0 {
-		logE.Info("no graph element is run")
-		return nil
+	if !buildspec.Batch.BuildMatrix.Empty() {
+		return handler.handleMatrix(ctx, logE, event, webhook, buildspec, repo, envs)
 	}
 
-	if len(graphElems) == 1 {
-		graphElem := graphElems[0]
-		input := &codebuild.StartBuildInput{
-			BuildspecOverride: aws.String(graphElem.Buildspec),
-			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:     aws.String(event.SHA),
-		}
-		if graphElem.DebugSession {
-			input.DebugSessionEnabled = aws.Bool(true)
-		}
-
-		for k, v := range graphElem.Env.Variables {
-			envs = append(envs, &codebuild.EnvironmentVariable{
-				Name:  aws.String(k),
-				Value: aws.String(v),
-			})
-		}
-		input.EnvironmentVariablesOverride = envs
-
-		if graphElem.Env.ComputeType != "" {
-			input.ComputeTypeOverride = aws.String(graphElem.Env.ComputeType)
-		}
-
-		if graphElem.Env.Image != "" {
-			input.ImageOverride = aws.String(graphElem.Env.Image)
-		}
-
-		if graphElem.Env.PrivilegedMode {
-			input.PrivilegedModeOverride = aws.Bool(true)
-		}
-
-		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, input)
-		if err != nil {
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.Build.Arn,
-		}).Info("start a build")
-	} else {
-		builtContent, err := yaml.Marshal(handler.generateBuildspec(buildspec, graphElems))
-		if err != nil {
-			return err
-		}
-		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-			BuildspecOverride:            aws.String(string(builtContent)),
-			ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:                aws.String(event.SHA),
-			EnvironmentVariablesOverride: envs,
-		})
-		if err != nil {
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.BuildBatch.Arn,
-		}).Info("start a batch build")
-	}
 	return nil
 }
 
