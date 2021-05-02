@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/antonmedv/expr"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
@@ -16,7 +17,6 @@ import (
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	wh "github.com/suzuki-shunsuke/lambuild/pkg/webhook"
-	"github.com/suzuki-shunsuke/matchfile-parser/matchfile"
 	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v2"
 )
@@ -29,7 +29,6 @@ type Handler struct {
 	Region          string
 	GitHub          *github.Client
 	CodeBuild       *codebuild.CodeBuild
-	MatchfileParser *matchfile.Parser
 }
 
 func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
@@ -42,62 +41,17 @@ func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
 }
 
 func (handler *Handler) matchHook(webhook wh.Webhook, event wh.Event, repo config.Repository, hook config.Hook) (bool, error) {
-	if len(hook.Event) != 0 {
-		eventMatched := false
-		for _, ev := range hook.Event {
-			if ev == webhook.Headers.Event {
-				eventMatched = true
-				break
-			}
-		}
-		if !eventMatched {
-			return false, nil
-		}
+	if hook.If == nil {
+		return true, nil
 	}
-
-	if hook.Ref != "" {
-		f, err := handler.MatchfileParser.Match([]string{event.Ref}, hook.RefConditions)
-		if err != nil {
-			return false, err
-		}
-		if !f {
-			return false, nil
-		}
+	f, err := expr.Run(hook.If, setExprFuncs(map[string]interface{}{
+		"event":   event,
+		"webhook": webhook,
+	}))
+	if err != nil {
+		return false, fmt.Errorf("evaluate an expression: %w", err)
 	}
-
-	if hook.BaseRef != "" {
-		f, err := handler.MatchfileParser.Match([]string{event.BaseRef}, hook.BaseRefConditions)
-		if err != nil {
-			return false, err
-		}
-		if !f {
-			return false, nil
-		}
-	}
-
-	if event.PRAuthor != "" && hook.Author != "" {
-		f, err := handler.MatchfileParser.Match([]string{event.PRAuthor}, hook.AuthorConditions)
-		if err != nil {
-			return false, err
-		}
-		if !f {
-			return false, nil
-		}
-	}
-
-	if webhook.Headers.Event == "pull_request" && hook.Label != "" {
-		f, err := handler.MatchfileParser.Match(event.Labels, hook.LabelConditions)
-		if err != nil {
-			return false, err
-		}
-		if !(hook.NoLabel && len(event.Labels) == 0 && !f) {
-			if !f {
-				return false, nil
-			}
-		}
-	}
-
-	return true, nil
+	return f.(bool), nil
 }
 
 func (handler *Handler) getHook(webhook wh.Webhook, event wh.Event, repo config.Repository) (config.Hook, bool, error) {
@@ -136,7 +90,6 @@ func (handler *Handler) handleEvent(ctx context.Context, webhook wh.Webhook, eve
 	}
 	logE = logE.WithFields(logrus.Fields{
 		"config": hook.Config,
-		"event":  hook.Event,
 	})
 
 	if event.HeadCommitMessage == "" {
@@ -346,44 +299,5 @@ func (handler *Handler) Init(ctx context.Context) error {
 		&oauth2.Token{AccessToken: handler.Secret.GitHubToken},
 	)))
 	handler.CodeBuild = codebuild.New(sess, aws.NewConfig().WithRegion(handler.Region))
-
-	handler.MatchfileParser = matchfile.NewParser()
-	for i, repo := range cfg.Repositories {
-		for j, hook := range repo.Hooks {
-			for _, ev := range hook.Event {
-				if ev != "push" && ev != "pull_request" {
-					return fmt.Errorf(`hook.event is invalid: %s`, ev)
-				}
-			}
-
-			conditions, err := handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.Ref), "\n"))
-			if err != nil {
-				return err
-			}
-			hook.RefConditions = conditions
-
-			conditions, err = handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.BaseRef), "\n"))
-			if err != nil {
-				return err
-			}
-			hook.BaseRefConditions = conditions
-
-			conditions, err = handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.Label), "\n"))
-			if err != nil {
-				return err
-			}
-			hook.LabelConditions = conditions
-
-			conditions, err = handler.MatchfileParser.ParseConditions(strings.Split(strings.TrimSpace(hook.Author), "\n"))
-			if err != nil {
-				return err
-			}
-			hook.AuthorConditions = conditions
-
-			repo.Hooks[j] = hook
-		}
-		cfg.Repositories[i] = repo
-	}
-
 	return nil
 }

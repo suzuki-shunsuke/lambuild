@@ -1,7 +1,10 @@
 package config
 
 import (
-	"github.com/suzuki-shunsuke/matchfile-parser/matchfile"
+	"fmt"
+
+	"github.com/antonmedv/expr"
+	"github.com/antonmedv/expr/vm"
 )
 
 type Config struct {
@@ -19,15 +22,27 @@ type CodeBuild struct {
 }
 
 type Hook struct {
-	Event             []string
-	Ref               string
-	BaseRef           string `yaml:"base-ref"`
-	Author            string
-	Label             string
-	RefConditions     []matchfile.Condition `yaml:"-"`
-	BaseRefConditions []matchfile.Condition `yaml:"-"`
-	AuthorConditions  []matchfile.Condition `yaml:"-"`
-	LabelConditions   []matchfile.Condition `yaml:"-"`
-	NoLabel           bool                  `yaml:"no-label"`
-	Config            string
+	If     *vm.Program
+	Config string
+}
+
+func (hook *Hook) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type alias Hook
+	a := struct {
+		*alias
+		If string
+	}{
+		alias: (*alias)(hook),
+	}
+	if err := unmarshal(&a); err != nil {
+		return err
+	}
+	if a.If != "" {
+		prog, err := expr.Compile(a.If, expr.AsBool())
+		if err != nil {
+			return fmt.Errorf("compile an expression: %s: %w", a.If, err)
+		}
+		hook.If = prog
+	}
+	return nil
 }
