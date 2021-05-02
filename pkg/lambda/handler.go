@@ -277,7 +277,7 @@ func (handler *Handler) Init(ctx context.Context) error {
 		return errors.New("the environment variable 'SSM_PARAMETER_NAME_GITHUB_TOKEN' is required")
 	}
 	secretNameWebhookSecret := os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET")
-	if secretNameWebhookSecret != "" {
+	if secretNameWebhookSecret == "" {
 		return errors.New("the environment variable 'SSM_PARAMETER_NAME_WEBHOOK_SECRET' is required")
 	}
 
