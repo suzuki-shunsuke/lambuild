@@ -30,14 +30,16 @@ type ExprElem struct {
 	If    *vm.Program
 }
 
-func (list ExprList) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (list *ExprList) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var val []interface{}
 	if err := unmarshal(&val); err != nil {
 		return err
 	}
+	arr := make(ExprList, len(val))
 	for i, a := range val {
 		if _, ok := a.(string); ok {
-			list[i] = a
+			arr[i] = a
+			continue
 		}
 		b, ok := a.(map[interface{}]interface{})
 		if !ok {
@@ -70,8 +72,9 @@ func (list ExprList) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				return errors.New("invalid key of buildspec: " + ks)
 			}
 		}
-		list[i] = bp
+		arr[i] = bp
 	}
+	*list = arr
 	return nil
 }
 

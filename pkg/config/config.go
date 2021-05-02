@@ -22,21 +22,20 @@ type CodeBuild struct {
 }
 
 type Hook struct {
-	If     *vm.Program
+	If     *vm.Program `yaml:"-"`
 	Config string
 }
 
 func (hook *Hook) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type alias Hook
 	a := struct {
-		*alias
-		If string
-	}{
-		alias: (*alias)(hook),
-	}
+		alias `yaml:",inline"`
+		If    string
+	}{}
 	if err := unmarshal(&a); err != nil {
 		return err
 	}
+	*hook = Hook(a.alias)
 	if a.If != "" {
 		prog, err := expr.Compile(a.If, expr.AsBool())
 		if err != nil {

@@ -14,7 +14,7 @@ type GraphElement struct {
 	Env           GraphEnv    `yaml:",omitempty"`
 	DebugSession  bool        `yaml:"debug-session,omitempty"`
 	IgnoreFailure bool        `yaml:"ignore-failure,omitempty"`
-	If            *vm.Program `yaml:",omitempty"`
+	If            *vm.Program `yaml:"-"`
 }
 
 type GraphEnv struct {
@@ -28,14 +28,13 @@ type GraphEnv struct {
 func (graph *GraphElement) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type alias GraphElement
 	a := struct {
-		*alias
-		If string
-	}{
-		alias: (*alias)(graph),
-	}
+		alias `yaml:",inline"`
+		If    string
+	}{}
 	if err := unmarshal(&a); err != nil {
 		return err
 	}
+	*graph = GraphElement(a.alias)
 	if a.If != "" {
 		prog, err := expr.Compile(a.If, expr.AsBool())
 		if err != nil {

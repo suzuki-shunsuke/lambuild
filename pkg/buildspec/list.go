@@ -13,7 +13,7 @@ type ListElement struct {
 	Env           ListEnv     `yaml:",omitempty"`
 	DebugSession  bool        `yaml:"debug-session,omitempty"`
 	IgnoreFailure bool        `yaml:"ignore-failure,omitempty"`
-	If            *vm.Program `yaml:",omitempty"`
+	If            *vm.Program `yaml:"-"`
 }
 
 type ListEnv struct {
@@ -27,14 +27,13 @@ type ListEnv struct {
 func (list *ListElement) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type alias ListElement
 	a := struct {
-		*alias
-		If string
-	}{
-		alias: (*alias)(list),
-	}
+		alias `yaml:",inline"`
+		If    string
+	}{}
 	if err := unmarshal(&a); err != nil {
 		return err
 	}
+	*list = ListElement(a.alias)
 	if a.If != "" {
 		prog, err := expr.Compile(a.If, expr.AsBool())
 		if err != nil {

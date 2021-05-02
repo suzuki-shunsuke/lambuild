@@ -70,8 +70,10 @@ func (handler *Handler) getHook(webhook wh.Webhook, event wh.Event, repo config.
 func (handler *Handler) handleEvent(ctx context.Context, webhook wh.Webhook, event wh.Event) error {
 	event.RepoOwner = strings.Split(event.RepoFullName, "/")[0]
 	logE := logrus.WithFields(logrus.Fields{
-		"repo": event.RepoFullName,
-		"ref":  event.Ref,
+		"repo_full_name": event.RepoFullName,
+		"repo_owner":     event.RepoOwner,
+		"repo_name":      event.RepoName,
+		"ref":            event.Ref,
 	})
 
 	repo, f := handler.getRepo(event.RepoFullName)
@@ -103,6 +105,10 @@ func (handler *Handler) handleEvent(ctx context.Context, webhook wh.Webhook, eve
 	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, event.RepoOwner, event.RepoName, hook.Config, &github.RepositoryContentGetOptions{Ref: event.Ref})
 	if err != nil {
 		logE.WithError(err).Debug("no content is found")
+		return nil
+	}
+	if file == nil {
+		logE.Warn("downloaded file is nil")
 		return nil
 	}
 	content, err := file.GetContent()
