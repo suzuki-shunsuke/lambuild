@@ -70,23 +70,23 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, even
 		logE.WithFields(logrus.Fields{
 			"build_arn": *buildOut.Build.Arn,
 		}).Info("start a build")
-	} else {
-		builtContent, err := yaml.Marshal(handler.generateListBuildspec(buildspec, listElems))
-		if err != nil {
-			return err
-		}
-		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-			BuildspecOverride:            aws.String(string(builtContent)),
-			ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:                aws.String(event.SHA),
-			EnvironmentVariablesOverride: envs,
-		})
-		if err != nil {
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.BuildBatch.Arn,
-		}).Info("start a batch build")
+		return nil
 	}
+	builtContent, err := yaml.Marshal(handler.generateListBuildspec(buildspec, listElems))
+	if err != nil {
+		return err
+	}
+	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
+		BuildspecOverride:            aws.String(string(builtContent)),
+		ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
+		SourceVersion:                aws.String(event.SHA),
+		EnvironmentVariablesOverride: envs,
+	})
+	if err != nil {
+		return fmt.Errorf("start a batch build: %w", err)
+	}
+	logE.WithFields(logrus.Fields{
+		"build_arn": *buildOut.BuildBatch.Arn,
+	}).Info("start a batch build")
 	return nil
 }

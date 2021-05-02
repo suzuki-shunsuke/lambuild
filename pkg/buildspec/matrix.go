@@ -1,13 +1,16 @@
 package buildspec
 
+import (
+	"errors"
+	"fmt"
+
+	"github.com/antonmedv/expr"
+	"github.com/antonmedv/expr/vm"
+)
+
 type Matrix struct {
 	Static  MatrixStatic
 	Dynamic MatrixDynamic
-}
-
-type LMatrix struct {
-	Static  MatrixStatic
-	Dynamic LMatrixDynamic
 }
 
 type MatrixStatic struct {
@@ -15,31 +18,67 @@ type MatrixStatic struct {
 	Env           MatrixStaticEnv `yaml:",omitempty"`
 }
 
-type MatrixFilter struct {
-	Value  string
-	Filter LambuildFilter
-}
-
 type MatrixDynamic struct {
-	Buildspec []string         `yaml:",omitempty"`
+	Buildspec ExprList         `yaml:",omitempty"`
 	Env       MatrixDynamicEnv `yaml:",omitempty"`
 }
 
-type LMatrixDynamic struct {
-	Buildspec []MatrixFilter   `yaml:",omitempty"`
-	Env       MatrixDynamicEnv `yaml:",omitempty"`
+type ExprList []interface{}
+
+type ExprElem struct {
+	Value string
+	If    *vm.Program
+}
+
+func (list ExprList) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var val []interface{}
+	if err := unmarshal(&val); err != nil {
+		return err
+	}
+	for i, a := range val {
+		if _, ok := a.(string); ok {
+			list[i] = a
+		}
+		b, ok := a.(map[interface{}]interface{})
+		if !ok {
+			return errors.New("buildspec must be string or map[interface{}]interface{}")
+		}
+		bp := ExprElem{}
+		for k, v := range b {
+			ks, ok := k.(string)
+			if !ok {
+				return errors.New("key of buildspec must be string")
+			}
+			switch ks {
+			case "value":
+				vs, ok := v.(string)
+				if !ok {
+					return errors.New("value of buildspec must be string")
+				}
+				bp.Value = vs
+			case "if":
+				vs, ok := v.(string)
+				if !ok {
+					return errors.New("if of buildspec must be string")
+				}
+				prog, err := expr.Compile(vs, expr.AsBool())
+				if err != nil {
+					return fmt.Errorf("compile an expression: %s: %w", vs, err)
+				}
+				bp.If = prog
+			default:
+				return errors.New("invalid key of buildspec: " + ks)
+			}
+		}
+		list[i] = bp
+	}
+	return nil
 }
 
 type MatrixDynamicEnv struct {
-	ComputeType []string            `yaml:"compute-type,omitempty"`
-	Image       []string            `yaml:",omitempty"`
-	Variables   map[string][]string `yaml:",omitempty"`
-}
-
-type LMatrixDynamicEnv struct {
-	ComputeType []MatrixFilter            `yaml:"compute-type,omitempty"`
-	Image       []MatrixFilter            `yaml:",omitempty"`
-	Variables   map[string][]MatrixFilter `yaml:",omitempty"`
+	ComputeType ExprList            `yaml:"compute-type,omitempty"`
+	Image       ExprList            `yaml:",omitempty"`
+	Variables   map[string]ExprList `yaml:",omitempty"`
 }
 
 type MatrixStaticEnv struct {
