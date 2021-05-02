@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/antonmedv/expr"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
@@ -15,17 +16,23 @@ import (
 
 func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, event wh.Event, webhook wh.Webhook, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
 	graphElems := []bspec.GraphElement{}
-	for _, graphElem := range buildspec.Batch.BuildGraph {
-		for _, filt := range graphElem.Lambuild.Filter {
-			f, err := handler.filter(filt, webhook, event)
-			if err != nil {
-				return err
-			}
-			if f {
-				graphElems = append(graphElems, graphElem)
-				break
-			}
+	for _, elem := range buildspec.Batch.BuildGraph {
+		if elem.If == nil {
+			graphElems = append(graphElems, elem)
+			continue
 		}
+		f, err := expr.Run(elem.If, setExprFuncs(map[string]interface{}{
+			"event":   event,
+			"webhook": webhook,
+		}))
+		if err != nil {
+			return fmt.Errorf("evaluate an expression: %w", err)
+		}
+		if !f.(bool) {
+			continue
+		}
+		elem.If = nil
+		graphElems = append(graphElems, elem)
 	}
 	if len(graphElems) == 0 {
 		logE.Info("no graph element is run")
@@ -70,23 +77,24 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, eve
 		logE.WithFields(logrus.Fields{
 			"build_arn": *buildOut.Build.Arn,
 		}).Info("start a build")
-	} else {
-		builtContent, err := yaml.Marshal(handler.generateBuildspec(buildspec, graphElems))
-		if err != nil {
-			return err
-		}
-		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-			BuildspecOverride:            aws.String(string(builtContent)),
-			ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:                aws.String(event.SHA),
-			EnvironmentVariablesOverride: envs,
-		})
-		if err != nil {
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.BuildBatch.Arn,
-		}).Info("start a batch build")
+		return nil
 	}
+	buildspec.Batch.BuildGraph = graphElems
+	builtContent, err := yaml.Marshal(buildspec)
+	if err != nil {
+		return err
+	}
+	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
+		BuildspecOverride:            aws.String(string(builtContent)),
+		ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
+		SourceVersion:                aws.String(event.SHA),
+		EnvironmentVariablesOverride: envs,
+	})
+	if err != nil {
+		return fmt.Errorf("start a batch build: %w", err)
+	}
+	logE.WithFields(logrus.Fields{
+		"build_arn": *buildOut.BuildBatch.Arn,
+	}).Info("start a batch build")
 	return nil
 }

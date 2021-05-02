@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/antonmedv/expr"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
@@ -16,16 +17,22 @@ import (
 func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, event wh.Event, webhook wh.Webhook, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
 	listElems := []bspec.ListElement{}
 	for _, listElem := range buildspec.Batch.BuildList {
-		for _, filt := range listElem.Lambuild.Filter {
-			f, err := handler.filter(filt, webhook, event)
-			if err != nil {
-				return err
-			}
-			if f {
-				listElems = append(listElems, listElem)
-				break
-			}
+		if listElem.If == nil {
+			listElems = append(listElems, listElem)
+			continue
 		}
+		f, err := expr.Run(listElem.If, setExprFuncs(map[string]interface{}{
+			"event":   event,
+			"webhook": webhook,
+		}))
+		if err != nil {
+			return fmt.Errorf("evaluate an expression: %w", err)
+		}
+		if !f.(bool) {
+			continue
+		}
+		listElem.If = nil
+		listElems = append(listElems, listElem)
 	}
 	if len(listElems) == 0 {
 		logE.Info("no list element is run")
@@ -72,7 +79,8 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, even
 		}).Info("start a build")
 		return nil
 	}
-	builtContent, err := yaml.Marshal(handler.generateListBuildspec(buildspec, listElems))
+	buildspec.Batch.BuildList = listElems
+	builtContent, err := yaml.Marshal(buildspec)
 	if err != nil {
 		return err
 	}
