@@ -1,6 +1,7 @@
 package lambda
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -13,6 +14,23 @@ import (
 	wh "github.com/suzuki-shunsuke/lambuild/pkg/webhook"
 	"gopkg.in/yaml.v2"
 )
+
+func (handler *Handler) setBuildStatusContext(event wh.Event, webhook wh.Webhook, input *codebuild.StartBuildInput) error {
+	if handler.BuildStatusContext == nil {
+		return nil
+	}
+	buf := &bytes.Buffer{}
+	if err := handler.BuildStatusContext.Execute(buf, map[string]interface{}{
+		"webhook": webhook,
+		"event":   event,
+	}); err != nil {
+		return fmt.Errorf("render a build status context: %w", err)
+	}
+	input.BuildStatusConfigOverride = &codebuild.BuildStatusConfig{
+		Context: aws.String(buf.String()),
+	}
+	return nil
+}
 
 func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, event wh.Event, webhook wh.Webhook, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
 	listElems := []bspec.ListElement{}
@@ -46,6 +64,11 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, even
 			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
 			SourceVersion:     aws.String(event.SHA),
 		}
+
+		if err := handler.setBuildStatusContext(event, webhook, input); err != nil {
+			return err
+		}
+
 		if listElem.DebugSession {
 			input.DebugSessionEnabled = aws.Bool(true)
 		}

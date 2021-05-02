@@ -7,7 +7,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/antonmedv/expr"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -22,13 +24,14 @@ import (
 )
 
 type Handler struct {
-	Config          config.Config
-	Secret          Secret
-	SecretID        string
-	SecretVersionID string
-	Region          string
-	GitHub          *github.Client
-	CodeBuild       *codebuild.CodeBuild
+	Config             config.Config
+	Secret             Secret
+	SecretID           string
+	SecretVersionID    string
+	Region             string
+	BuildStatusContext *template.Template
+	GitHub             *github.Client
+	CodeBuild          *codebuild.CodeBuild
 }
 
 func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
@@ -285,6 +288,14 @@ func (handler *Handler) Init(ctx context.Context) error {
 	secretNameWebhookSecret := os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET")
 	if secretNameWebhookSecret == "" {
 		return errors.New("the environment variable 'SSM_PARAMETER_NAME_WEBHOOK_SECRET' is required")
+	}
+
+	if context := os.Getenv("BUILD_STATUS_CONTEXT"); context != "" {
+		tpl, err := template.New("_").Funcs(sprig.TxtFuncMap()).Parse(context)
+		if err != nil {
+			return fmt.Errorf("parse BUILD_STATUS_CONTEXT as template (%s): %w", context, err)
+		}
+		handler.BuildStatusContext = tpl
 	}
 
 	if err := handler.readSecretFromSSM(ctx, sess, secretNameGitHubToken, secretNameWebhookSecret); err != nil {

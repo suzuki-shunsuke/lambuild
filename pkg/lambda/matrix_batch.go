@@ -60,7 +60,6 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 }
 
 func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, event wh.Event, webhook wh.Webhook, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
-	// TODO filter variables
 	buildspecs, err := handler.filterExprList(event, webhook, buildspec.Batch.BuildMatrix.Dynamic.Buildspec)
 	if err != nil {
 		return fmt.Errorf("filter buildspecs: %w", err)
@@ -115,6 +114,11 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, ev
 		ProjectName:   aws.String(repo.CodeBuild.ProjectName),
 		SourceVersion: aws.String(event.SHA),
 	}
+
+	if err := handler.setBuildStatusContext(event, webhook, input); err != nil {
+		return err
+	}
+
 	if len(buildspecs) != 0 {
 		input.BuildspecOverride = aws.String(buildspecs[0].(string))
 	}

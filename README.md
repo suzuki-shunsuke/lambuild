@@ -39,11 +39,17 @@ GitHub Webhook => API Gateway => Lambda => CodeBuild
 
 ### Lambda Function's Environment Variables
 
+#### Required
+
 * CONFIG
 * REGION
-* LOG_LEVEL
 * SSM_PARAMETER_NAME_GITHUB_TOKEN
 * SSM_PARAMETER_NAME_WEBHOOK_SECRET
+
+#### Optional
+
+* LOG_LEVEL
+* BUILD_STATUS_CONTEXT
 
 ### AWS Systems Manager Parameter Store
 

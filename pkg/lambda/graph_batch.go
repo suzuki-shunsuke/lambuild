@@ -50,6 +50,10 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, eve
 			input.DebugSessionEnabled = aws.Bool(true)
 		}
 
+		if err := handler.setBuildStatusContext(event, webhook, input); err != nil {
+			return err
+		}
+
 		for k, v := range graphElem.Env.Variables {
 			envs = append(envs, &codebuild.EnvironmentVariable{
 				Name:  aws.String(k),
