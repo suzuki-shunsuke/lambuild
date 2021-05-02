@@ -1,18 +1,5 @@
 package buildspec
 
-type Lambuild struct {
-	Filter []LambuildFilter
-}
-
-type LambuildFilter struct {
-	Event   []string
-	File    string
-	Label   string
-	Ref     string
-	BaseRef string `yaml:"base-ref"`
-	Author  string
-}
-
 type Buildspec struct {
 	Version float64 `yaml:"version"`
 	Env     Env     `yaml:",omitempty"`
