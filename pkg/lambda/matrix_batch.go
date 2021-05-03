@@ -44,33 +44,12 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, da
 
 	if len(buildspecs) > 1 || len(images) > 1 || len(computeTypes) > 1 || getSizeOfEnvVars(envVars) > 1 {
 		// batch build
-		builtContent, err := yaml.Marshal(buildspec)
-		if err != nil {
+		input := &codebuild.StartBuildBatchInput{}
+		if err := handler.setMatrixBatchBuildInput(input, data, buildspec, repo, buildspecs, images, computeTypes, envVars); err != nil {
 			return err
 		}
 
-		envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
-		for k, prog := range data.Lambuild.Env.Variables {
-			a, err := runExpr(prog, data)
-			if err != nil {
-				return err
-			}
-			s, ok := a.(string)
-			if !ok {
-				return errors.New("the evaluated result must be string: lambuild.env." + k)
-			}
-			envs = append(envs, &codebuild.EnvironmentVariable{
-				Name:  aws.String(k),
-				Value: aws.String(s),
-			})
-		}
-
-		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-			BuildspecOverride:            aws.String(string(builtContent)),
-			ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:                aws.String(data.SHA),
-			EnvironmentVariablesOverride: envs,
-		})
+		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, input)
 		if err != nil {
 			return fmt.Errorf("start a batch build: %w", err)
 		}
@@ -127,6 +106,35 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 		size *= len(v)
 	}
 	return size
+}
+
+func (handler *Handler) setMatrixBatchBuildInput(input *codebuild.StartBuildBatchInput, data *Data, buildspec bspec.Buildspec, repo config.Repository, buildspecs, images, computeTypes bspec.ExprList, envVars map[string]bspec.ExprList) error {
+	builtContent, err := yaml.Marshal(buildspec)
+	if err != nil {
+		return err
+	}
+
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
+	for k, prog := range data.Lambuild.Env.Variables {
+		a, err := runExpr(prog, data)
+		if err != nil {
+			return err
+		}
+		s, ok := a.(string)
+		if !ok {
+			return errors.New("the evaluated result must be string: lambuild.env." + k)
+		}
+		envs = append(envs, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(s),
+		})
+	}
+
+	input.BuildspecOverride = aws.String(string(builtContent))
+	input.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+	input.SourceVersion = aws.String(data.SHA)
+	input.EnvironmentVariablesOverride = envs
+	return nil
 }
 
 func (handler *Handler) setMatrixBuildInput(data *Data, repo config.Repository, buildspecs, images, computeTypes bspec.ExprList, envVars map[string]bspec.ExprList, input *codebuild.StartBuildInput) error {
