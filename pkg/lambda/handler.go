@@ -168,6 +168,13 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 	return buildspec, nil
 }
 
+type BuildInput struct {
+	Build      *codebuild.StartBuildInput
+	BatchBuild *codebuild.StartBuildBatchInput
+	Batched    bool
+	Empty      bool
+}
+
 func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 	logE := logrus.WithFields(logrus.Fields{
 		"repo_full_name": data.Repository.FullName,
@@ -200,15 +207,57 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 		return err
 	}
 
+	buildInput := &BuildInput{
+		Build: &codebuild.StartBuildInput{
+			ProjectName:   aws.String(repo.CodeBuild.ProjectName),
+			SourceVersion: aws.String(data.SHA),
+		},
+		BatchBuild: &codebuild.StartBuildBatchInput{
+			ProjectName:   aws.String(repo.CodeBuild.ProjectName),
+			SourceVersion: aws.String(data.SHA),
+		},
+	}
+
 	if len(buildspec.Batch.BuildGraph) != 0 {
-		return handler.handleGraph(ctx, logE, data, buildspec, repo)
+		if err := handler.handleGraph(buildInput, logE, data, buildspec, repo); err != nil {
+			return err
+		}
 	}
+
 	if len(buildspec.Batch.BuildList) != 0 {
-		return handler.handleList(ctx, logE, data, buildspec, repo)
+		if err := handler.handleList(buildInput, logE, data, buildspec, repo); err != nil {
+			return err
+		}
 	}
+
 	if !buildspec.Batch.BuildMatrix.Empty() {
-		return handler.handleMatrix(ctx, logE, data, buildspec, repo)
+		if err := handler.handleMatrix(buildInput, logE, data, buildspec, repo); err != nil {
+			return err
+		}
 	}
+
+	if buildInput.Empty {
+		return nil
+	}
+
+	if buildInput.Batched {
+		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
+		if err != nil {
+			return fmt.Errorf("start a batch build: %w", err)
+		}
+		logE.WithFields(logrus.Fields{
+			"build_arn": *buildOut.BuildBatch.Arn,
+		}).Info("start a batch build")
+		return nil
+	}
+
+	buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, buildInput.Build)
+	if err != nil {
+		return fmt.Errorf("start a batch build: %w", err)
+	}
+	logE.WithFields(logrus.Fields{
+		"build_arn": *buildOut.Build.Arn,
+	}).Info("start a build")
 
 	return nil
 }

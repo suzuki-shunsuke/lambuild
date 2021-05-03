@@ -1,7 +1,6 @@
 package lambda
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -13,50 +12,30 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
+func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
 	elems, err := handler.extractGraph(logE, data, buildspec.Batch.BuildGraph)
 	if err != nil {
 		return err
 	}
 	if len(elems) == 0 {
 		logE.Info("no graph element is run")
+		buildInput.Empty = true
 		return nil
 	}
 
 	if len(elems) == 1 {
 		elem := elems[0]
-		input := &codebuild.StartBuildInput{
-			BuildspecOverride: aws.String(elem.Buildspec),
-			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:     aws.String(data.SHA),
-		}
-		if err := handler.setGraphBuildInput(input, data, elem); err != nil {
+		buildInput.Build.BuildspecOverride = aws.String(elem.Buildspec)
+		if err := handler.setGraphBuildInput(buildInput.Build, data, elem); err != nil {
 			return err
 		}
-
-		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, input)
-		if err != nil {
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.Build.Arn,
-		}).Info("start a build")
 		return nil
 	}
 
-	input := &codebuild.StartBuildBatchInput{}
-
-	if err := handler.setGraphBatchBuildInput(input, repo, buildspec, data, elems); err != nil {
+	buildInput.Batched = true
+	if err := handler.setGraphBatchBuildInput(buildInput.BatchBuild, repo, buildspec, data, elems); err != nil {
 		return err
 	}
-
-	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, input)
-	if err != nil {
-		return fmt.Errorf("start a batch build: %w", err)
-	}
-	logE.WithFields(logrus.Fields{
-		"build_arn": *buildOut.BuildBatch.Arn,
-	}).Info("start a batch build")
 	return nil
 }
 

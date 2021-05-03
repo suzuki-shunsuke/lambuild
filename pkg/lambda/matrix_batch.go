@@ -1,7 +1,6 @@
 package lambda
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -13,7 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
+func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
 	buildspecs, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Buildspec)
 	if err != nil {
 		return fmt.Errorf("filter buildspecs: %w", err)
@@ -42,36 +41,24 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, da
 	}
 	buildspec.Batch.BuildMatrix.Dynamic.Env.Variables = envVars
 
+	if len(buildspecs) == 0 && len(images) == 0 && len(computeTypes) == 0 && getSizeOfEnvVars(envVars) == 0 {
+		buildInput.Empty = true
+		return nil
+	}
+
 	if len(buildspecs) > 1 || len(images) > 1 || len(computeTypes) > 1 || getSizeOfEnvVars(envVars) > 1 {
 		// batch build
-		input := &codebuild.StartBuildBatchInput{}
-		if err := handler.setMatrixBatchBuildInput(input, data, buildspec, repo, buildspecs, images, computeTypes, envVars); err != nil {
+		buildInput.Batched = true
+		if err := handler.setMatrixBatchBuildInput(buildInput.BatchBuild, data, buildspec, repo, buildspecs, images, computeTypes, envVars); err != nil {
 			return err
 		}
-
-		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, input)
-		if err != nil {
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.BuildBatch.Arn,
-		}).Info("start a batch build")
 		return nil
 	}
 
 	// build
-	input := &codebuild.StartBuildInput{}
-	if err := handler.setMatrixBuildInput(data, repo, buildspecs, images, computeTypes, envVars, input); err != nil {
+	if err := handler.setMatrixBuildInput(data, repo, buildspecs, images, computeTypes, envVars, buildInput.Build); err != nil {
 		return err
 	}
-
-	buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, input)
-	if err != nil {
-		return fmt.Errorf("start a batch build: %w", err)
-	}
-	logE.WithFields(logrus.Fields{
-		"build_arn": *buildOut.Build.Arn,
-	}).Info("start a build")
 
 	return nil
 }
