@@ -14,7 +14,7 @@ import (
 )
 
 func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
-	elems, err := handler.extractGraph(ctx, logE, data, buildspec)
+	elems, err := handler.extractGraph(logE, data, buildspec.Batch.BuildGraph)
 	if err != nil {
 		return err
 	}
@@ -75,9 +75,9 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, dat
 	return nil
 }
 
-func (handler *Handler) extractGraph(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) ([]bspec.GraphElement, error) {
-	identifiers := make(map[string]bspec.GraphElement, len(buildspec.Batch.BuildGraph))
-	for _, elem := range buildspec.Batch.BuildGraph {
+func (handler *Handler) extractGraph(logE *logrus.Entry, data *Data, allElems []bspec.GraphElement) ([]bspec.GraphElement, error) {
+	identifiers := make(map[string]bspec.GraphElement, len(allElems))
+	for _, elem := range allElems {
 		if elem.If == nil {
 			identifiers[elem.Identifier] = elem
 			continue
