@@ -33,6 +33,56 @@ type Handler struct {
 	ErrorNotificationTemplate *template.Template
 }
 
+func (handler *Handler) Do(ctx context.Context, event Event) error {
+	if err := github.ValidateSignature(event.Headers.Signature, []byte(event.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
+		// TODO return 400
+		logrus.Debug(err)
+		return nil
+	}
+	body, err := github.ParseWebHook(event.Headers.Event, []byte(event.Body))
+	if err != nil {
+		return fmt.Errorf("parse a webhook payload: %w", err)
+	}
+	event.Payload = body
+
+	data := &Data{
+		Event: event,
+	}
+
+	if event.Headers.Event != "push" && event.Headers.Event != "pull_request" {
+		return nil
+	}
+
+	switch event.Headers.Event {
+	case "push":
+		pushEvent := body.(*github.PushEvent)
+		repo := pushEvent.GetRepo()
+		data.Repository = Repository{
+			FullName: repo.GetFullName(),
+			Name:     repo.GetName(),
+		}
+		data.HeadCommitMessage = pushEvent.GetHeadCommit().GetMessage()
+		data.SHA = pushEvent.GetAfter()
+		data.Ref = pushEvent.GetRef()
+	case "pull_request":
+		prEvent := body.(*github.PullRequestEvent)
+
+		repo := prEvent.GetRepo()
+		pr := prEvent.GetPullRequest()
+		data.Repository = Repository{
+			FullName: repo.GetFullName(),
+			Name:     repo.GetName(),
+		}
+		data.SHA = prEvent.GetAfter()
+		handler.setPullRequest(data, pr)
+	}
+	if err := handler.handleEvent(ctx, data); err != nil {
+		handler.sendErrorNotificaiton(ctx, err, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.SHA)
+		return err
+	}
+	return nil
+}
+
 func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
 	for _, repo := range handler.Config.Repositories {
 		if repo.Name == repoName {
@@ -168,56 +218,6 @@ Please check.
 ` + "```" + `
 {{.Error}}
 ` + "```"
-
-func (handler *Handler) Do(ctx context.Context, event Event) error {
-	if err := github.ValidateSignature(event.Headers.Signature, []byte(event.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
-		// TODO return 400
-		fmt.Println(err)
-		return nil
-	}
-	body, err := github.ParseWebHook(event.Headers.Event, []byte(event.Body))
-	if err != nil {
-		return fmt.Errorf("parse a webhook payload: %w", err)
-	}
-	event.Payload = body
-
-	data := &Data{
-		Event: event,
-	}
-
-	if event.Headers.Event != "push" && event.Headers.Event != "pull_request" {
-		return nil
-	}
-
-	switch event.Headers.Event {
-	case "push":
-		pushEvent := body.(*github.PushEvent)
-		repo := pushEvent.GetRepo()
-		data.Repository = Repository{
-			FullName: repo.GetFullName(),
-			Name:     repo.GetName(),
-		}
-		data.HeadCommitMessage = pushEvent.GetHeadCommit().GetMessage()
-		data.SHA = pushEvent.GetAfter()
-		data.Ref = pushEvent.GetRef()
-	case "pull_request":
-		prEvent := body.(*github.PullRequestEvent)
-
-		repo := prEvent.GetRepo()
-		pr := prEvent.GetPullRequest()
-		data.Repository = Repository{
-			FullName: repo.GetFullName(),
-			Name:     repo.GetName(),
-		}
-		data.SHA = prEvent.GetAfter()
-		handler.setPullRequest(data, pr)
-	}
-	if err := handler.handleEvent(ctx, data); err != nil {
-		handler.sendErrorNotificaiton(ctx, err, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.SHA)
-		return err
-	}
-	return nil
-}
 
 func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repoOwner, repoName string, prNumber int, sha string) {
 	logE := logrus.WithFields(logrus.Fields{
