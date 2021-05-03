@@ -14,10 +14,10 @@ import (
 )
 
 func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
-	graphElems := []bspec.GraphElement{}
+	identifiers := make(map[string]bspec.GraphElement, len(buildspec.Batch.BuildGraph))
 	for _, elem := range buildspec.Batch.BuildGraph {
 		if elem.If == nil {
-			graphElems = append(graphElems, elem)
+			identifiers[elem.Identifier] = elem
 			continue
 		}
 		f, err := runExpr(elem.If, data)
@@ -28,15 +28,40 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, dat
 			continue
 		}
 		elem.If = nil
-		graphElems = append(graphElems, elem)
+		identifiers[elem.Identifier] = elem
 	}
-	if len(graphElems) == 0 {
+	for {
+		removed := false
+		for identifier, elem := range identifiers {
+			for _, dep := range elem.DependOn {
+				if _, ok := identifiers[dep]; !ok {
+					logE.WithFields(logrus.Fields{
+						"build_identifier":     identifier,
+						"dependent_identifier": dep,
+					}).Info("a build isn't run because a dependent build isn't run")
+					delete(identifiers, identifier)
+					removed = true
+					break
+				}
+			}
+		}
+		if !removed {
+			break
+		}
+	}
+
+	if len(identifiers) == 0 {
 		logE.Info("no graph element is run")
 		return nil
 	}
 
-	if len(graphElems) == 1 {
-		graphElem := graphElems[0]
+	elems := make([]bspec.GraphElement, 0, len(identifiers))
+	for _, elem := range identifiers {
+		elems = append(elems, elem)
+	}
+
+	if len(elems) == 1 {
+		graphElem := elems[0]
 		input := &codebuild.StartBuildInput{
 			BuildspecOverride: aws.String(graphElem.Buildspec),
 			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
@@ -98,7 +123,7 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, dat
 		}).Info("start a build")
 		return nil
 	}
-	buildspec.Batch.BuildGraph = graphElems
+	buildspec.Batch.BuildGraph = elems
 	builtContent, err := yaml.Marshal(buildspec)
 	if err != nil {
 		return err
