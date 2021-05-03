@@ -3,6 +3,7 @@ package lambda
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -13,17 +14,19 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) setBuildStatusContext(data Data, input *codebuild.StartBuildInput) error {
+func (handler *Handler) setBuildStatusContext(data *Data, input *codebuild.StartBuildInput) error {
 	if handler.BuildStatusContext == nil {
 		return nil
 	}
 	buf := &bytes.Buffer{}
 	if err := handler.BuildStatusContext.Execute(buf, map[string]interface{}{
-		"event": data.Event,
-		"pr":    data.PullRequest,
-		"repo":  data.Repository,
-		"sha":   data.SHA,
-		"ref":   data.Ref,
+		"event":         data.Event,
+		"pr":            data.PullRequest,
+		"repo":          data.Repository,
+		"sha":           data.SHA,
+		"ref":           data.Ref,
+		"commit":        data.GetCommit,
+		"commitMessage": data.CommitMessage,
 	}); err != nil {
 		return fmt.Errorf("render a build status context: %w", err)
 	}
@@ -33,7 +36,7 @@ func (handler *Handler) setBuildStatusContext(data Data, input *codebuild.StartB
 	return nil
 }
 
-func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data Data, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
+func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
 	listElems := []bspec.ListElement{}
 	for _, listElem := range buildspec.Batch.BuildList {
 		if listElem.If == nil {
@@ -71,12 +74,31 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data
 			input.DebugSessionEnabled = aws.Bool(true)
 		}
 
+		if len(listElem.Env.Variables) == 0 {
+			listElem.Env.Variables = make(map[string]string, len(data.Lambuild.Env.Variables))
+		}
+		for k, prog := range data.Lambuild.Env.Variables {
+			if _, ok := listElem.Env.Variables[k]; ok {
+				continue
+			}
+			a, err := runExpr(prog, data)
+			if err != nil {
+				return err
+			}
+			s, ok := a.(string)
+			if !ok {
+				return errors.New("the evaluated result must be string: lambuild.env." + k)
+			}
+			listElem.Env.Variables[k] = s
+		}
+		envs := make([]*codebuild.EnvironmentVariable, 0, len(listElem.Env.Variables))
 		for k, v := range listElem.Env.Variables {
 			envs = append(envs, &codebuild.EnvironmentVariable{
 				Name:  aws.String(k),
 				Value: aws.String(v),
 			})
 		}
+
 		input.EnvironmentVariablesOverride = envs
 
 		if listElem.Env.ComputeType != "" {
@@ -105,6 +127,23 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data
 	if err != nil {
 		return err
 	}
+
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
+	for k, prog := range data.Lambuild.Env.Variables {
+		a, err := runExpr(prog, data)
+		if err != nil {
+			return err
+		}
+		s, ok := a.(string)
+		if !ok {
+			return errors.New("the evaluated result must be string: lambuild.env." + k)
+		}
+		envs = append(envs, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(s),
+		})
+	}
+
 	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 		BuildspecOverride:            aws.String(string(builtContent)),
 		ProjectName:                  aws.String(repo.CodeBuild.ProjectName),

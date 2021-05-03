@@ -2,6 +2,7 @@ package lambda
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -12,7 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, data Data, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
+func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
 	graphElems := []bspec.GraphElement{}
 	for _, elem := range buildspec.Batch.BuildGraph {
 		if elem.If == nil {
@@ -49,6 +50,25 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, dat
 			return err
 		}
 
+		if len(graphElem.Env.Variables) == 0 {
+			graphElem.Env.Variables = make(map[string]string, len(data.Lambuild.Env.Variables))
+		}
+
+		for k, prog := range data.Lambuild.Env.Variables {
+			if _, ok := graphElem.Env.Variables[k]; ok {
+				continue
+			}
+			a, err := runExpr(prog, data)
+			if err != nil {
+				return err
+			}
+			s, ok := a.(string)
+			if !ok {
+				return errors.New("the evaluated result must be string: lambuild.env." + k)
+			}
+			graphElem.Env.Variables[k] = s
+		}
+		envs := make([]*codebuild.EnvironmentVariable, 0, len(graphElem.Env.Variables))
 		for k, v := range graphElem.Env.Variables {
 			envs = append(envs, &codebuild.EnvironmentVariable{
 				Name:  aws.String(k),
@@ -83,6 +103,23 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, dat
 	if err != nil {
 		return err
 	}
+
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
+	for k, prog := range data.Lambuild.Env.Variables {
+		a, err := runExpr(prog, data)
+		if err != nil {
+			return err
+		}
+		s, ok := a.(string)
+		if !ok {
+			return errors.New("the evaluated result must be string: lambuild.env." + k)
+		}
+		envs = append(envs, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(s),
+		})
+	}
+
 	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 		BuildspecOverride:            aws.String(string(builtContent)),
 		ProjectName:                  aws.String(repo.CodeBuild.ProjectName),

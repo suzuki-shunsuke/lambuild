@@ -18,6 +18,7 @@ func Test_handler_handleMatrix(t *testing.T) {
 			data: Data{
 				PullRequest: PullRequest{
 					ChangedFileNames: []string{"modules/README.md"},
+					LabelNames:       []string{},
 				},
 				Event: Event{
 					Headers: Headers{
@@ -27,9 +28,9 @@ func Test_handler_handleMatrix(t *testing.T) {
 			},
 			expression: `
 			event.Headers.Event == "push" ||
-			any(pr.LabelNames, {# in ["api"]}) ||
-			any(pr.ChangedFileNames, {# startsWith "api/"}) ||
-			any(pr.ChangedFileNames, {regexp.match("^modules/", #)})`,
+			any(getPRLabelNames(), {# in ["api"]}) ||
+			any(getPRFileNames(), {# startsWith "api/"}) ||
+			any(getPRFileNames(), {regexp.match("^modules/", #)})`,
 			exp: true,
 		},
 	}
@@ -41,7 +42,7 @@ func Test_handler_handleMatrix(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			a, err := runExpr(exp, d.data)
+			a, err := runExpr(exp, &d.data)
 			if err != nil {
 				t.Fatal(err)
 			}

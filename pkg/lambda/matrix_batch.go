@@ -2,8 +2,8 @@ package lambda
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"regexp"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
@@ -13,20 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func setExprFuncs(env map[string]interface{}) map[string]interface{} {
-	env["regexp"] = map[string]interface{}{
-		"match": func(pattern, s string) bool {
-			f, err := regexp.MatchString(pattern, s)
-			if err != nil {
-				panic(err)
-			}
-			return f
-		},
-	}
-	return env
-}
-
-func (handler *Handler) filterExprList(data Data, src bspec.ExprList) (bspec.ExprList, error) {
+func (handler *Handler) filterExprList(data *Data, src bspec.ExprList) (bspec.ExprList, error) {
 	list := bspec.ExprList{}
 	for _, bs := range src {
 		s, ok := bs.(string)
@@ -35,6 +22,10 @@ func (handler *Handler) filterExprList(data Data, src bspec.ExprList) (bspec.Exp
 			continue
 		}
 		a := bs.(bspec.ExprElem)
+		if a.If == nil {
+			list = append(list, a.Value)
+			continue
+		}
 		f, err := runExpr(a.If, data)
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
@@ -54,7 +45,7 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 	return size
 }
 
-func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, data Data, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
+func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
 	buildspecs, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Buildspec)
 	if err != nil {
 		return fmt.Errorf("filter buildspecs: %w", err)
@@ -89,6 +80,23 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, da
 		if err != nil {
 			return err
 		}
+
+		envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
+		for k, prog := range data.Lambuild.Env.Variables {
+			a, err := runExpr(prog, data)
+			if err != nil {
+				return err
+			}
+			s, ok := a.(string)
+			if !ok {
+				return errors.New("the evaluated result must be string: lambuild.env." + k)
+			}
+			envs = append(envs, &codebuild.EnvironmentVariable{
+				Name:  aws.String(k),
+				Value: aws.String(s),
+			})
+		}
+
 		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 			BuildspecOverride:            aws.String(string(builtContent)),
 			ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
@@ -123,7 +131,24 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, da
 	if len(computeTypes) != 0 {
 		input.ComputeTypeOverride = aws.String(computeTypes[0].(string))
 	}
-	if getSizeOfEnvVars(envVars) != 0 {
+	if getSizeOfEnvVars(envVars) == 0 {
+		envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
+		for k, prog := range data.Lambuild.Env.Variables {
+			a, err := runExpr(prog, data)
+			if err != nil {
+				return err
+			}
+			s, ok := a.(string)
+			if !ok {
+				return errors.New("the evaluated result must be string: lambuild.env." + k)
+			}
+			envs = append(envs, &codebuild.EnvironmentVariable{
+				Name:  aws.String(k),
+				Value: aws.String(s),
+			})
+		}
+		input.EnvironmentVariablesOverride = envs
+	} else {
 		list := make([]*codebuild.EnvironmentVariable, 0, len(envVars))
 		for k, v := range envVars {
 			list = append(list, &codebuild.EnvironmentVariable{
@@ -131,6 +156,25 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, da
 				Value: aws.String(v[0].(string)),
 			})
 		}
+
+		for k, prog := range data.Lambuild.Env.Variables {
+			if _, ok := envVars[k]; ok {
+				continue
+			}
+			a, err := runExpr(prog, data)
+			if err != nil {
+				return err
+			}
+			s, ok := a.(string)
+			if !ok {
+				return errors.New("the evaluated result must be string: lambuild.env." + k)
+			}
+			list = append(list, &codebuild.EnvironmentVariable{
+				Name:  aws.String(k),
+				Value: aws.String(s),
+			})
+		}
+
 		input.EnvironmentVariablesOverride = list
 	}
 

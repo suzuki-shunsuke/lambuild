@@ -7,14 +7,6 @@ import (
 	"github.com/google/go-github/v35/github"
 )
 
-// type PullRequest struct {
-// 	Number      int
-// 	PullRequest *github.PullRequest
-// 	Files       []*github.CommitFile
-// 	Labels      []string
-// 	FileNames   []string
-// }
-
 func extractLabelNames(labels []*github.Label) []string {
 	labelNames := make([]string, len(labels))
 	for i, label := range labels {

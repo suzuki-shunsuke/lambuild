@@ -5,13 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
@@ -43,17 +40,7 @@ func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
 	return config.Repository{}, false
 }
 
-func runExpr(prog *vm.Program, data Data) (interface{}, error) {
-	return expr.Run(prog, setExprFuncs(map[string]interface{}{
-		"event": data.Event,
-		"pr":    data.PullRequest,
-		"repo":  data.Repository,
-		"sha":   data.SHA,
-		"ref":   data.Ref,
-	}))
-}
-
-func (handler *Handler) matchHook(data Data, repo config.Repository, hook config.Hook) (bool, error) {
+func (handler *Handler) matchHook(data *Data, repo config.Repository, hook config.Hook) (bool, error) {
 	if hook.If == nil {
 		return true, nil
 	}
@@ -64,7 +51,7 @@ func (handler *Handler) matchHook(data Data, repo config.Repository, hook config
 	return f.(bool), nil
 }
 
-func (handler *Handler) getHook(data Data, repo config.Repository) (config.Hook, bool, error) {
+func (handler *Handler) getHook(data *Data, repo config.Repository) (config.Hook, bool, error) {
 	for _, hook := range repo.Hooks {
 		f, err := handler.matchHook(data, repo, hook)
 		if err != nil {
@@ -77,8 +64,9 @@ func (handler *Handler) getHook(data Data, repo config.Repository) (config.Hook,
 	return config.Hook{}, false, nil
 }
 
-func (handler *Handler) handleEvent(ctx context.Context, data Data) error {
+func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 	data.Repository.Owner = strings.Split(data.Repository.FullName, "/")[0]
+	data.GitHub = handler.GitHub
 	logE := logrus.WithFields(logrus.Fields{
 		"repo_full_name": data.Repository.FullName,
 		"repo_owner":     data.Repository.Owner,
@@ -104,14 +92,6 @@ func (handler *Handler) handleEvent(ctx context.Context, data Data) error {
 		"config": hook.Config,
 	})
 
-	if data.HeadCommitMessage == "" {
-		commit, _, err := handler.GitHub.Git.GetCommit(ctx, data.Repository.Owner, data.Repository.Name, data.SHA)
-		if err != nil {
-			return fmt.Errorf("get a commit: %w", err)
-		}
-		data.HeadCommitMessage = commit.GetMessage()
-	}
-
 	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, hook.Config, &github.RepositoryContentGetOptions{Ref: data.Ref})
 	if err != nil {
 		logE.WithError(err).Debug("no content is found")
@@ -130,25 +110,8 @@ func (handler *Handler) handleEvent(ctx context.Context, data Data) error {
 	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
 		return fmt.Errorf("unmarshal a buildspec: %w", err)
 	}
-
-	envs := []*codebuild.EnvironmentVariable{
-		{
-			Name:  aws.String("LAMBUILD_WEBHOOK_BODY"),
-			Value: aws.String(data.Event.Body),
-		},
-		{
-			Name:  aws.String("LAMBUILD_WEBHOOK_EVENT"),
-			Value: aws.String(data.Event.Headers.Event),
-		},
-		{
-			Name:  aws.String("LAMBUILD_WEBHOOK_DELIVERY"),
-			Value: aws.String(data.Event.Headers.Delivery),
-		},
-		{
-			Name:  aws.String("LAMBUILD_HEAD_COMMIT_MSG"),
-			Value: aws.String(data.HeadCommitMessage),
-		},
-	}
+	data.Lambuild = buildspec.Lambuild
+	buildspec.Lambuild = bspec.Lambuild{}
 
 	prNum := 0
 	if data.PullRequest.PullRequest == nil {
@@ -167,7 +130,7 @@ func (handler *Handler) handleEvent(ctx context.Context, data Data) error {
 			if err != nil {
 				return fmt.Errorf("get a pull request: %w", err)
 			}
-			handler.setPullRequest(&data, pr)
+			handler.setPullRequest(data, pr)
 		}
 
 		files, _, err := getPRFiles(ctx, handler.GitHub, data.Repository.Owner, data.Repository.Name, prNum, data.PullRequest.PullRequest.GetChangedFiles())
@@ -175,30 +138,16 @@ func (handler *Handler) handleEvent(ctx context.Context, data Data) error {
 			return fmt.Errorf("get pull request files: %w", err)
 		}
 		data.PullRequest.ChangedFileNames = extractPRFileNames(files)
-
-		envs = append(envs, &codebuild.EnvironmentVariable{
-			Name:  aws.String("LAMBUILD_PR_NUMBER"),
-			Value: aws.String(strconv.Itoa(prNum)),
-		}, &codebuild.EnvironmentVariable{
-			Name:  aws.String("LAMBUILD_PR_AUTHOR"),
-			Value: aws.String(data.PullRequest.PullRequest.GetUser().GetLogin()),
-		}, &codebuild.EnvironmentVariable{
-			Name:  aws.String("LAMBUILD_PR_BASE_REF"),
-			Value: aws.String(data.PullRequest.PullRequest.GetBase().GetRef()),
-		}, &codebuild.EnvironmentVariable{
-			Name:  aws.String("LAMBUILD_PR_HEAD_REF"),
-			Value: aws.String(data.PullRequest.PullRequest.GetHead().GetRef()),
-		})
 	}
 
 	if len(buildspec.Batch.BuildGraph) != 0 {
-		return handler.handleGraph(ctx, logE, data, buildspec, repo, envs)
+		return handler.handleGraph(ctx, logE, data, buildspec, repo)
 	}
 	if len(buildspec.Batch.BuildList) != 0 {
-		return handler.handleList(ctx, logE, data, buildspec, repo, envs)
+		return handler.handleList(ctx, logE, data, buildspec, repo)
 	}
 	if !buildspec.Batch.BuildMatrix.Empty() {
-		return handler.handleMatrix(ctx, logE, data, buildspec, repo, envs)
+		return handler.handleMatrix(ctx, logE, data, buildspec, repo)
 	}
 
 	return nil
@@ -212,7 +161,7 @@ func (handler *Handler) setPullRequest(data *Data, pr *github.PullRequest) {
 
 func (handler *Handler) handlePushEvent(ctx context.Context, event Event, pushEvent *github.PushEvent) error {
 	repo := pushEvent.GetRepo()
-	data := Data{
+	data := &Data{
 		Event: event,
 		Repository: Repository{
 			FullName: repo.GetFullName(),
@@ -229,7 +178,7 @@ func (handler *Handler) handlePREvent(ctx context.Context, event Event, prEvent 
 	repo := prEvent.GetRepo()
 	pr := prEvent.GetPullRequest()
 
-	data := Data{
+	data := &Data{
 		Event: event,
 		Repository: Repository{
 			FullName: repo.GetFullName(),
@@ -237,7 +186,7 @@ func (handler *Handler) handlePREvent(ctx context.Context, event Event, prEvent 
 		},
 		SHA: prEvent.GetAfter(),
 	}
-	handler.setPullRequest(&data, pr)
+	handler.setPullRequest(data, pr)
 	return handler.handleEvent(ctx, data)
 }
 
@@ -251,6 +200,7 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 	if err != nil {
 		return fmt.Errorf("parse a webhook payload: %w", err)
 	}
+	event.Payload = body
 
 	switch event.Headers.Event {
 	case "push":
