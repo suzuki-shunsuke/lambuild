@@ -1,6 +1,7 @@
 package lambda
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -21,14 +22,15 @@ import (
 )
 
 type Handler struct {
-	Config             config.Config
-	Secret             Secret
-	SecretID           string
-	SecretVersionID    string
-	Region             string
-	BuildStatusContext *template.Template
-	GitHub             *github.Client
-	CodeBuild          *codebuild.CodeBuild
+	Config                    config.Config
+	Secret                    Secret
+	SecretID                  string
+	SecretVersionID           string
+	Region                    string
+	BuildStatusContext        *template.Template
+	GitHub                    *github.Client
+	CodeBuild                 *codebuild.CodeBuild
+	ErrorNotificationTemplate *template.Template
 }
 
 func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
@@ -190,6 +192,14 @@ func (handler *Handler) handlePREvent(ctx context.Context, event Event, prEvent 
 	return handler.handleEvent(ctx, data)
 }
 
+const errorNotificationTemplate = `
+lambuild failed to procceed the request.
+Please check.
+
+` + "```" + `
+{{.Error}}
+` + "```"
+
 func (handler *Handler) Do(ctx context.Context, event Event) error {
 	if err := github.ValidateSignature(event.Headers.Signature, []byte(event.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
 		// TODO return 400
@@ -206,7 +216,36 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 	case "push":
 		return handler.handlePushEvent(ctx, event, body.(*github.PushEvent))
 	case "pull_request":
-		return handler.handlePREvent(ctx, event, body.(*github.PullRequestEvent))
+		prEvent := body.(*github.PullRequestEvent)
+		if err := handler.handlePREvent(ctx, event, prEvent); err != nil {
+			logE := logrus.WithFields(logrus.Fields{
+				"original_error": err,
+				"repo_owner":     prEvent.GetRepo().GetOwner().GetLogin(),
+				"repo_name":      prEvent.GetRepo().GetName(),
+				"pr_number":      prEvent.GetNumber(),
+			})
+			// generate a comment
+			buf := &bytes.Buffer{}
+			cmt := ""
+			if renderErr := handler.ErrorNotificationTemplate.Execute(buf, map[string]interface{}{
+				"Error": err,
+			}); renderErr != nil {
+				logE.WithError(renderErr).Error("render a comment to send it to the pull request")
+				cmt = "lambuild failed to procceed the request: " + err.Error()
+			} else {
+				cmt = buf.String()
+			}
+			// send a comment to pull request
+			if _, _, cmtErr := handler.GitHub.Issues.CreateComment(ctx, prEvent.GetRepo().GetOwner().GetLogin(), prEvent.GetRepo().GetName(), prEvent.GetNumber(), &github.IssueComment{
+				Body: github.String(cmt),
+			}); cmtErr != nil {
+				logE.WithError(cmtErr).Error("send a comment to the pull request")
+				return err
+			}
+			logE.Info("send a comment to the pull request")
+			return err
+		}
+		return nil
 	default:
 		return nil
 	}
@@ -270,6 +309,12 @@ func (handler *Handler) Init(ctx context.Context) error {
 			logrus.SetLevel(lvl)
 		}
 	}
+
+	tpl, err := template.New("_").Parse(errorNotificationTemplate)
+	if err != nil {
+		return fmt.Errorf("parse an error notification template: %w", err)
+	}
+	handler.ErrorNotificationTemplate = tpl
 
 	handler.GitHub = github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: handler.Secret.GitHubToken},
