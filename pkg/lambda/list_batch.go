@@ -24,8 +24,13 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data
 	}
 
 	if len(listElems) == 1 {
-		input, err := handler.getListBuildInput(data, repo, listElems[0])
-		if err != nil {
+		elem := listElems[0]
+		input := &codebuild.StartBuildInput{
+			BuildspecOverride: aws.String(elem.Buildspec),
+			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
+			SourceVersion:     aws.String(data.SHA),
+		}
+		if err := handler.setListBuildInput(input, data, elem); err != nil {
 			return err
 		}
 		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, input)
@@ -74,13 +79,7 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data
 	return nil
 }
 
-func (handler *Handler) getListBuildInput(data *Data, repo config.Repository, listElem bspec.ListElement) (*codebuild.StartBuildInput, error) {
-	input := &codebuild.StartBuildInput{
-		BuildspecOverride: aws.String(listElem.Buildspec),
-		ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-		SourceVersion:     aws.String(data.SHA),
-	}
-
+func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data *Data, listElem bspec.ListElement) error {
 	if listElem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(listElem.Env.ComputeType)
 	}
@@ -94,7 +93,7 @@ func (handler *Handler) getListBuildInput(data *Data, repo config.Repository, li
 	}
 
 	if err := handler.setBuildStatusContext(data, input); err != nil {
-		return nil, err
+		return err
 	}
 
 	if listElem.DebugSession {
@@ -110,11 +109,11 @@ func (handler *Handler) getListBuildInput(data *Data, repo config.Repository, li
 		}
 		a, err := runExpr(prog, data)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		s, ok := a.(string)
 		if !ok {
-			return nil, errors.New("the evaluated result must be string: lambuild.env." + k)
+			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
 		listElem.Env.Variables[k] = s
 	}
@@ -128,7 +127,7 @@ func (handler *Handler) getListBuildInput(data *Data, repo config.Repository, li
 
 	input.EnvironmentVariablesOverride = envs
 
-	return input, nil
+	return nil
 }
 
 func (handler *Handler) extractBuildList(data *Data, allElems []bspec.ListElement) ([]bspec.ListElement, error) {
