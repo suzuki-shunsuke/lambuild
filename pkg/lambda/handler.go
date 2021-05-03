@@ -315,7 +315,12 @@ func (handler *Handler) Init(ctx context.Context) error {
 		}
 	}
 
-	tpl, err := template.New("_").Parse(errorNotificationTemplate)
+	errTpl := os.Getenv("ERROR_NOTIFICATION_TEMPLATE")
+	if errTpl == "" {
+		errTpl = errorNotificationTemplate
+	}
+
+	tpl, err := template.New("_").Parse(errTpl)
 	if err != nil {
 		return fmt.Errorf("parse an error notification template: %w", err)
 	}
