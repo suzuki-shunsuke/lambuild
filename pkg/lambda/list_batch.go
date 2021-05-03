@@ -14,21 +14,9 @@ import (
 )
 
 func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
-	listElems := []bspec.ListElement{}
-	for _, listElem := range buildspec.Batch.BuildList {
-		if listElem.If == nil {
-			listElems = append(listElems, listElem)
-			continue
-		}
-		f, err := runExpr(listElem.If, data)
-		if err != nil {
-			return fmt.Errorf("evaluate an expression: %w", err)
-		}
-		if !f.(bool) {
-			continue
-		}
-		listElem.If = nil
-		listElems = append(listElems, listElem)
+	listElems, err := handler.extractBuildList(data, buildspec.Batch.BuildList)
+	if err != nil {
+		return err
 	}
 	if len(listElems) == 0 {
 		logE.Info("no list element is run")
@@ -134,4 +122,24 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data
 		"build_arn": *buildOut.BuildBatch.Arn,
 	}).Info("start a batch build")
 	return nil
+}
+
+func (handler *Handler) extractBuildList(data *Data, allElems []bspec.ListElement) ([]bspec.ListElement, error) {
+	listElems := []bspec.ListElement{}
+	for _, listElem := range allElems {
+		if listElem.If == nil {
+			listElems = append(listElems, listElem)
+			continue
+		}
+		f, err := runExpr(listElem.If, data)
+		if err != nil {
+			return nil, fmt.Errorf("evaluate an expression: %w", err)
+		}
+		if !f.(bool) {
+			continue
+		}
+		listElem.If = nil
+		listElems = append(listElems, listElem)
+	}
+	return listElems, nil
 }
