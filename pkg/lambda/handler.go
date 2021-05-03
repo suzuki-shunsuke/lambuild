@@ -167,33 +167,6 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 	data.Lambuild = buildspec.Lambuild
 	buildspec.Lambuild = bspec.Lambuild{}
 
-	prNum := 0
-	if data.PullRequest.PullRequest == nil {
-		n, err := getPRNumber(ctx, data.Repository.Owner, data.Repository.Name, data.SHA, handler.GitHub)
-		if err != nil {
-			return err
-		}
-		prNum = n
-	} else {
-		prNum = data.PullRequest.PullRequest.GetNumber()
-	}
-
-	if prNum != 0 {
-		if data.PullRequest.PullRequest == nil {
-			pr, _, err := handler.GitHub.PullRequests.Get(ctx, data.Repository.Owner, data.Repository.Name, prNum)
-			if err != nil {
-				return fmt.Errorf("get a pull request: %w", err)
-			}
-			handler.setPullRequest(data, pr)
-		}
-
-		files, _, err := getPRFiles(ctx, handler.GitHub, data.Repository.Owner, data.Repository.Name, prNum, data.PullRequest.PullRequest.GetChangedFiles())
-		if err != nil {
-			return fmt.Errorf("get pull request files: %w", err)
-		}
-		data.PullRequest.ChangedFileNames = extractPRFileNames(files)
-	}
-
 	if len(buildspec.Batch.BuildGraph) != 0 {
 		return handler.handleGraph(ctx, logE, data, buildspec, repo)
 	}
