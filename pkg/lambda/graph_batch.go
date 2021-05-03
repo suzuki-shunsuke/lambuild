@@ -24,8 +24,13 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, dat
 	}
 
 	if len(elems) == 1 {
-		input, err := handler.getGraphBuildInput(data, repo, elems[0])
-		if err != nil {
+		elem := elems[0]
+		input := &codebuild.StartBuildInput{
+			BuildspecOverride: aws.String(elem.Buildspec),
+			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
+			SourceVersion:     aws.String(data.SHA),
+		}
+		if err := handler.setGraphBuildInput(input, data, elem); err != nil {
 			return err
 		}
 
@@ -123,13 +128,7 @@ func (handler *Handler) extractGraph(logE *logrus.Entry, data *Data, allElems []
 	return elems, nil
 }
 
-func (handler *Handler) getGraphBuildInput(data *Data, repo config.Repository, graphElem bspec.GraphElement) (*codebuild.StartBuildInput, error) {
-	input := &codebuild.StartBuildInput{
-		BuildspecOverride: aws.String(graphElem.Buildspec),
-		ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-		SourceVersion:     aws.String(data.SHA),
-	}
-
+func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, data *Data, graphElem bspec.GraphElement) error {
 	if graphElem.DebugSession {
 		input.DebugSessionEnabled = aws.Bool(true)
 	}
@@ -147,7 +146,7 @@ func (handler *Handler) getGraphBuildInput(data *Data, repo config.Repository, g
 	}
 
 	if err := handler.setBuildStatusContext(data, input); err != nil {
-		return nil, err
+		return err
 	}
 
 	if graphElem.Env.Variables == nil {
@@ -161,11 +160,11 @@ func (handler *Handler) getGraphBuildInput(data *Data, repo config.Repository, g
 		}
 		a, err := runExpr(prog, data)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		s, ok := a.(string)
 		if !ok {
-			return nil, errors.New("the evaluated result must be string: lambuild.env." + k)
+			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
 		graphElem.Env.Variables[k] = s
 	}
@@ -177,5 +176,5 @@ func (handler *Handler) getGraphBuildInput(data *Data, repo config.Repository, g
 		})
 	}
 	input.EnvironmentVariablesOverride = envs
-	return input, nil
+	return nil
 }
