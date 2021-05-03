@@ -81,11 +81,57 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, da
 	}
 
 	// build
-	input := &codebuild.StartBuildInput{
-		ProjectName:   aws.String(repo.CodeBuild.ProjectName),
-		SourceVersion: aws.String(data.SHA),
+	input := &codebuild.StartBuildInput{}
+	if err := handler.setMatrixBuildInput(data, repo, buildspecs, images, computeTypes, envVars, input); err != nil {
+		return err
 	}
 
+	buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, input)
+	if err != nil {
+		return fmt.Errorf("start a batch build: %w", err)
+	}
+	logE.WithFields(logrus.Fields{
+		"build_arn": *buildOut.Build.Arn,
+	}).Info("start a build")
+
+	return nil
+}
+
+func (handler *Handler) filterExprList(data *Data, src bspec.ExprList) (bspec.ExprList, error) {
+	list := bspec.ExprList{}
+	for _, bs := range src {
+		s, ok := bs.(string)
+		if ok {
+			list = append(list, s)
+			continue
+		}
+		a := bs.(bspec.ExprElem)
+		if a.If == nil {
+			list = append(list, a.Value)
+			continue
+		}
+		f, err := runExpr(a.If, data)
+		if err != nil {
+			return nil, fmt.Errorf("evaluate an expression: %w", err)
+		}
+		if f.(bool) {
+			list = append(list, a.Value)
+		}
+	}
+	return list, nil
+}
+
+func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
+	size := 1
+	for _, v := range m {
+		size *= len(v)
+	}
+	return size
+}
+
+func (handler *Handler) setMatrixBuildInput(data *Data, repo config.Repository, buildspecs, images, computeTypes bspec.ExprList, envVars map[string]bspec.ExprList, input *codebuild.StartBuildInput) error {
+	input.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+	input.SourceVersion = aws.String(data.SHA)
 	if err := handler.setBuildStatusContext(data, input); err != nil {
 		return err
 	}
@@ -146,45 +192,5 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, da
 		input.EnvironmentVariablesOverride = list
 	}
 
-	buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, input)
-	if err != nil {
-		return fmt.Errorf("start a batch build: %w", err)
-	}
-	logE.WithFields(logrus.Fields{
-		"build_arn": *buildOut.Build.Arn,
-	}).Info("start a build")
-
 	return nil
-}
-
-func (handler *Handler) filterExprList(data *Data, src bspec.ExprList) (bspec.ExprList, error) {
-	list := bspec.ExprList{}
-	for _, bs := range src {
-		s, ok := bs.(string)
-		if ok {
-			list = append(list, s)
-			continue
-		}
-		a := bs.(bspec.ExprElem)
-		if a.If == nil {
-			list = append(list, a.Value)
-			continue
-		}
-		f, err := runExpr(a.If, data)
-		if err != nil {
-			return nil, fmt.Errorf("evaluate an expression: %w", err)
-		}
-		if f.(bool) {
-			list = append(list, a.Value)
-		}
-	}
-	return list, nil
-}
-
-func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
-	size := 1
-	for _, v := range m {
-		size *= len(v)
-	}
-	return size
 }
