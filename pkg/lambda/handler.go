@@ -213,18 +213,19 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 		handler.setPullRequest(data, pr)
 	}
 	if err := handler.handleEvent(ctx, data); err != nil {
-		handler.sendErrorNotificaiton(ctx, err, data.Repository.Owner, data.Repository.Name, data.GetPRNumber())
+		handler.sendErrorNotificaiton(ctx, err, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.SHA)
 		return err
 	}
 	return nil
 }
 
-func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repoOwner, repoName string, prNumber int) {
+func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repoOwner, repoName string, prNumber int, sha string) {
 	logE := logrus.WithFields(logrus.Fields{
 		"original_error": e,
 		"repo_owner":     repoOwner,
 		"repo_name":      repoName,
 		"pr_number":      prNumber,
+		"sha":            sha,
 	})
 	// generate a comment
 	buf := &bytes.Buffer{}
@@ -236,6 +237,15 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 		cmt = "lambuild failed to procceed the request: " + e.Error()
 	} else {
 		cmt = buf.String()
+	}
+	if prNumber == 0 {
+		if _, _, cmtErr := handler.GitHub.Repositories.CreateComment(ctx, repoOwner, repoName, sha, &github.RepositoryComment{
+			Body: github.String(cmt),
+		}); cmtErr != nil {
+			logE.WithError(cmtErr).Error("send a comment to the commit")
+		}
+		logE.Info("send a comment to the commit")
+		return
 	}
 	// send a comment to pull request
 	if _, _, cmtErr := handler.GitHub.Issues.CreateComment(ctx, repoOwner, repoName, prNumber, &github.IssueComment{
