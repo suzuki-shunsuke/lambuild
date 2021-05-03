@@ -5,24 +5,25 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/antonmedv/expr"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
-	wh "github.com/suzuki-shunsuke/lambuild/pkg/webhook"
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) setBuildStatusContext(event wh.Event, webhook wh.Webhook, input *codebuild.StartBuildInput) error {
+func (handler *Handler) setBuildStatusContext(data Data, input *codebuild.StartBuildInput) error {
 	if handler.BuildStatusContext == nil {
 		return nil
 	}
 	buf := &bytes.Buffer{}
 	if err := handler.BuildStatusContext.Execute(buf, map[string]interface{}{
-		"webhook": webhook,
-		"event":   event,
+		"event": data.Event,
+		"pr":    data.PullRequest,
+		"repo":  data.Repository,
+		"sha":   data.SHA,
+		"ref":   data.Ref,
 	}); err != nil {
 		return fmt.Errorf("render a build status context: %w", err)
 	}
@@ -32,17 +33,14 @@ func (handler *Handler) setBuildStatusContext(event wh.Event, webhook wh.Webhook
 	return nil
 }
 
-func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, event wh.Event, webhook wh.Webhook, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
+func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data Data, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
 	listElems := []bspec.ListElement{}
 	for _, listElem := range buildspec.Batch.BuildList {
 		if listElem.If == nil {
 			listElems = append(listElems, listElem)
 			continue
 		}
-		f, err := expr.Run(listElem.If, setExprFuncs(map[string]interface{}{
-			"event":   event,
-			"webhook": webhook,
-		}))
+		f, err := runExpr(listElem.If, data)
 		if err != nil {
 			return fmt.Errorf("evaluate an expression: %w", err)
 		}
@@ -62,10 +60,10 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, even
 		input := &codebuild.StartBuildInput{
 			BuildspecOverride: aws.String(listElem.Buildspec),
 			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:     aws.String(event.SHA),
+			SourceVersion:     aws.String(data.SHA),
 		}
 
-		if err := handler.setBuildStatusContext(event, webhook, input); err != nil {
+		if err := handler.setBuildStatusContext(data, input); err != nil {
 			return err
 		}
 
@@ -110,7 +108,7 @@ func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, even
 	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 		BuildspecOverride:            aws.String(string(builtContent)),
 		ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-		SourceVersion:                aws.String(event.SHA),
+		SourceVersion:                aws.String(data.SHA),
 		EnvironmentVariablesOverride: envs,
 	})
 	if err != nil {

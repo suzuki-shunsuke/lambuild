@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/antonmedv/expr"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
-	wh "github.com/suzuki-shunsuke/lambuild/pkg/webhook"
 	"gopkg.in/yaml.v2"
 )
 
@@ -28,7 +26,7 @@ func setExprFuncs(env map[string]interface{}) map[string]interface{} {
 	return env
 }
 
-func (handler *Handler) filterExprList(event wh.Event, webhook wh.Webhook, src bspec.ExprList) (bspec.ExprList, error) {
+func (handler *Handler) filterExprList(data Data, src bspec.ExprList) (bspec.ExprList, error) {
 	list := bspec.ExprList{}
 	for _, bs := range src {
 		s, ok := bs.(string)
@@ -37,10 +35,7 @@ func (handler *Handler) filterExprList(event wh.Event, webhook wh.Webhook, src b
 			continue
 		}
 		a := bs.(bspec.ExprElem)
-		f, err := expr.Run(a.If, setExprFuncs(map[string]interface{}{
-			"event":   event,
-			"webhook": webhook,
-		}))
+		f, err := runExpr(a.If, data)
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
 		}
@@ -59,20 +54,20 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 	return size
 }
 
-func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, event wh.Event, webhook wh.Webhook, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
-	buildspecs, err := handler.filterExprList(event, webhook, buildspec.Batch.BuildMatrix.Dynamic.Buildspec)
+func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, data Data, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
+	buildspecs, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Buildspec)
 	if err != nil {
 		return fmt.Errorf("filter buildspecs: %w", err)
 	}
 	buildspec.Batch.BuildMatrix.Dynamic.Buildspec = buildspecs
 
-	images, err := handler.filterExprList(event, webhook, buildspec.Batch.BuildMatrix.Dynamic.Env.Image)
+	images, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Env.Image)
 	if err != nil {
 		return fmt.Errorf("filter images: %w", err)
 	}
 	buildspec.Batch.BuildMatrix.Dynamic.Env.Image = images
 
-	computeTypes, err := handler.filterExprList(event, webhook, buildspec.Batch.BuildMatrix.Dynamic.Env.ComputeType)
+	computeTypes, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Env.ComputeType)
 	if err != nil {
 		return fmt.Errorf("filter compute-type: %w", err)
 	}
@@ -80,7 +75,7 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, ev
 
 	envVars := make(map[string]bspec.ExprList, len(buildspec.Batch.BuildMatrix.Dynamic.Env.Variables))
 	for k, v := range buildspec.Batch.BuildMatrix.Dynamic.Env.Variables {
-		vars, err := handler.filterExprList(event, webhook, v)
+		vars, err := handler.filterExprList(data, v)
 		if err != nil {
 			return fmt.Errorf("filter env.variables: %w", err)
 		}
@@ -97,7 +92,7 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, ev
 		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 			BuildspecOverride:            aws.String(string(builtContent)),
 			ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:                aws.String(event.SHA),
+			SourceVersion:                aws.String(data.SHA),
 			EnvironmentVariablesOverride: envs,
 		})
 		if err != nil {
@@ -112,10 +107,10 @@ func (handler *Handler) handleMatrix(ctx context.Context, logE *logrus.Entry, ev
 	// build
 	input := &codebuild.StartBuildInput{
 		ProjectName:   aws.String(repo.CodeBuild.ProjectName),
-		SourceVersion: aws.String(event.SHA),
+		SourceVersion: aws.String(data.SHA),
 	}
 
-	if err := handler.setBuildStatusContext(event, webhook, input); err != nil {
+	if err := handler.setBuildStatusContext(data, input); err != nil {
 		return err
 	}
 

@@ -4,27 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/antonmedv/expr"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
-	wh "github.com/suzuki-shunsuke/lambuild/pkg/webhook"
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, event wh.Event, webhook wh.Webhook, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
+func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, data Data, buildspec bspec.Buildspec, repo config.Repository, envs []*codebuild.EnvironmentVariable) error {
 	graphElems := []bspec.GraphElement{}
 	for _, elem := range buildspec.Batch.BuildGraph {
 		if elem.If == nil {
 			graphElems = append(graphElems, elem)
 			continue
 		}
-		f, err := expr.Run(elem.If, setExprFuncs(map[string]interface{}{
-			"event":   event,
-			"webhook": webhook,
-		}))
+		f, err := runExpr(elem.If, data)
 		if err != nil {
 			return fmt.Errorf("evaluate an expression: %w", err)
 		}
@@ -44,13 +39,13 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, eve
 		input := &codebuild.StartBuildInput{
 			BuildspecOverride: aws.String(graphElem.Buildspec),
 			ProjectName:       aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion:     aws.String(event.SHA),
+			SourceVersion:     aws.String(data.SHA),
 		}
 		if graphElem.DebugSession {
 			input.DebugSessionEnabled = aws.Bool(true)
 		}
 
-		if err := handler.setBuildStatusContext(event, webhook, input); err != nil {
+		if err := handler.setBuildStatusContext(data, input); err != nil {
 			return err
 		}
 
@@ -91,7 +86,7 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, eve
 	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
 		BuildspecOverride:            aws.String(string(builtContent)),
 		ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-		SourceVersion:                aws.String(event.SHA),
+		SourceVersion:                aws.String(data.SHA),
 		EnvironmentVariablesOverride: envs,
 	})
 	if err != nil {

@@ -3,6 +3,8 @@ package webhook
 type Webhook struct {
 	Body    string  `json:"body"`
 	Headers Headers `json:"headers"`
+
+	Payload interface{} `json:"-"`
 }
 
 type Headers struct {
@@ -17,14 +19,10 @@ type Event struct {
 
 	RepoOwner string
 
-	Ref              string
-	PRAuthor         string
-	BaseRef          string
-	HeadRef          string
-	ChangedFileNames []string
-	Labels           []string
-
-	PRNum int
+	Ref      string
+	PRAuthor string
+	BaseRef  string
+	HeadRef  string
 
 	HeadCommitMessage string
 
