@@ -8,11 +8,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
-	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
+func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
 	buildspecs, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Buildspec)
 	if err != nil {
 		return fmt.Errorf("filter buildspecs: %w", err)
@@ -42,6 +41,7 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	buildspec.Batch.BuildMatrix.Dynamic.Env.Variables = envVars
 
 	if len(buildspecs) == 0 && len(images) == 0 && len(computeTypes) == 0 && getSizeOfEnvVars(envVars) == 0 {
+		logE.Info("no matrix element is run")
 		buildInput.Empty = true
 		return nil
 	}
@@ -49,15 +49,15 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	if len(buildspecs) > 1 || len(images) > 1 || len(computeTypes) > 1 || getSizeOfEnvVars(envVars) > 1 {
 		// batch build
 		buildInput.Batched = true
-		if err := handler.setMatrixBatchBuildInput(buildInput.BatchBuild, data, buildspec, repo, buildspecs, images, computeTypes, envVars); err != nil {
-			return err
+		if err := handler.setMatrixBatchBuildInput(buildInput.BatchBuild, data, buildspec, buildspecs, images, computeTypes, envVars); err != nil {
+			return fmt.Errorf("set codebuild.StartBuildBatchInput: %w", err)
 		}
 		return nil
 	}
 
 	// build
-	if err := handler.setMatrixBuildInput(data, repo, buildspecs, images, computeTypes, envVars, buildInput.Build); err != nil {
-		return err
+	if err := handler.setMatrixBuildInput(data, buildspecs, images, computeTypes, envVars, buildInput.Build); err != nil {
+		return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 	}
 
 	return nil
@@ -71,7 +71,7 @@ func (handler *Handler) filterExprList(data *Data, src bspec.ExprList) (bspec.Ex
 			list = append(list, s)
 			continue
 		}
-		a := bs.(bspec.ExprElem)
+		a := bs.(bspec.ExprElem) //nolint:forcetypeassert
 		if a.If == nil {
 			list = append(list, a.Value)
 			continue
@@ -95,10 +95,15 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 	return size
 }
 
-func (handler *Handler) setMatrixBatchBuildInput(input *codebuild.StartBuildBatchInput, data *Data, buildspec bspec.Buildspec, repo config.Repository, buildspecs, images, computeTypes bspec.ExprList, envVars map[string]bspec.ExprList) error {
-	builtContent, err := yaml.Marshal(buildspec)
-	if err != nil {
-		return err
+func (handler *Handler) setMatrixBatchBuildInput(input *codebuild.StartBuildBatchInput, data *Data, buildspec bspec.Buildspec, buildspecs, images, computeTypes bspec.ExprList, envVars map[string]bspec.ExprList) error {
+	if len(buildspecs) > 0 {
+		input.BuildspecOverride = aws.String(buildspecs[0].(string))
+	} else {
+		builtContent, err := yaml.Marshal(buildspec)
+		if err != nil {
+			return fmt.Errorf("marshal a buildspec: %w", err)
+		}
+		input.BuildspecOverride = aws.String(string(builtContent))
 	}
 
 	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
@@ -117,16 +122,15 @@ func (handler *Handler) setMatrixBatchBuildInput(input *codebuild.StartBuildBatc
 		})
 	}
 
-	input.BuildspecOverride = aws.String(string(builtContent))
-	input.ProjectName = aws.String(repo.CodeBuild.ProjectName)
-	input.SourceVersion = aws.String(data.SHA)
+	if len(images) > 0 {
+		input.ImageOverride = aws.String(images[0].(string))
+	}
+
 	input.EnvironmentVariablesOverride = envs
 	return nil
 }
 
-func (handler *Handler) setMatrixBuildInput(data *Data, repo config.Repository, buildspecs, images, computeTypes bspec.ExprList, envVars map[string]bspec.ExprList, input *codebuild.StartBuildInput) error {
-	input.ProjectName = aws.String(repo.CodeBuild.ProjectName)
-	input.SourceVersion = aws.String(data.SHA)
+func (handler *Handler) setMatrixBuildInput(data *Data, buildspecs, images, computeTypes bspec.ExprList, envVars map[string]bspec.ExprList, input *codebuild.StartBuildInput) error {
 	if err := handler.setBuildStatusContext(data, input); err != nil {
 		return err
 	}
@@ -157,35 +161,35 @@ func (handler *Handler) setMatrixBuildInput(data *Data, repo config.Repository, 
 			})
 		}
 		input.EnvironmentVariablesOverride = envs
-	} else {
-		list := make([]*codebuild.EnvironmentVariable, 0, len(envVars))
-		for k, v := range envVars {
-			list = append(list, &codebuild.EnvironmentVariable{
-				Name:  aws.String(k),
-				Value: aws.String(v[0].(string)),
-			})
-		}
-
-		for k, prog := range data.Lambuild.Env.Variables {
-			if _, ok := envVars[k]; ok {
-				continue
-			}
-			a, err := runExpr(prog, data)
-			if err != nil {
-				return err
-			}
-			s, ok := a.(string)
-			if !ok {
-				return errors.New("the evaluated result must be string: lambuild.env." + k)
-			}
-			list = append(list, &codebuild.EnvironmentVariable{
-				Name:  aws.String(k),
-				Value: aws.String(s),
-			})
-		}
-
-		input.EnvironmentVariablesOverride = list
+		return nil
 	}
+	list := make([]*codebuild.EnvironmentVariable, 0, len(envVars))
+	for k, v := range envVars {
+		list = append(list, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(v[0].(string)),
+		})
+	}
+
+	for k, prog := range data.Lambuild.Env.Variables {
+		if _, ok := envVars[k]; ok {
+			continue
+		}
+		a, err := runExpr(prog, data)
+		if err != nil {
+			return err
+		}
+		s, ok := a.(string)
+		if !ok {
+			return errors.New("the evaluated result must be string: lambuild.env." + k)
+		}
+		list = append(list, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(s),
+		})
+	}
+
+	input.EnvironmentVariablesOverride = list
 
 	return nil
 }

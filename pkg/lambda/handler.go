@@ -67,7 +67,7 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 
 	switch event.Headers.Event {
 	case "push":
-		pushEvent := body.(*github.PushEvent)
+		pushEvent := body.(*github.PushEvent) //nolint:forcetypeassert
 		repo := pushEvent.GetRepo()
 		data.Repository = Repository{
 			FullName: repo.GetFullName(),
@@ -77,7 +77,7 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 		data.SHA = pushEvent.GetAfter()
 		data.Ref = pushEvent.GetRef()
 	case "pull_request":
-		prEvent := body.(*github.PullRequestEvent)
+		prEvent := body.(*github.PullRequestEvent) //nolint:forcetypeassert
 
 		repo := prEvent.GetRepo()
 		pr := prEvent.GetPullRequest()
@@ -219,19 +219,19 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 	}
 
 	if len(buildspec.Batch.BuildGraph) != 0 {
-		if err := handler.handleGraph(buildInput, logE, data, buildspec, repo); err != nil {
+		if err := handler.handleGraph(buildInput, logE, data, buildspec); err != nil {
 			return err
 		}
 	}
 
 	if len(buildspec.Batch.BuildList) != 0 {
-		if err := handler.handleList(buildInput, logE, data, buildspec, repo); err != nil {
+		if err := handler.handleList(buildInput, logE, data, buildspec); err != nil {
 			return err
 		}
 	}
 
 	if !buildspec.Batch.BuildMatrix.Empty() {
-		if err := handler.handleMatrix(buildInput, logE, data, buildspec, repo); err != nil {
+		if err := handler.handleMatrix(buildInput, logE, data, buildspec); err != nil {
 			return err
 		}
 	}
@@ -276,7 +276,7 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 
 	// generate a comment
 	buf := &bytes.Buffer{}
-	cmt := ""
+	var cmt string
 	if renderErr := handler.ErrorNotificationTemplate.Execute(buf, map[string]interface{}{
 		"Error": e,
 	}); renderErr != nil {

@@ -8,11 +8,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
-	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
+func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
 	listElems, err := handler.extractBuildList(data, buildspec.Batch.BuildList)
 	if err != nil {
 		return err
@@ -27,23 +26,23 @@ func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, d
 		elem := listElems[0]
 		buildInput.Build.BuildspecOverride = aws.String(elem.Buildspec)
 		if err := handler.setListBuildInput(buildInput.Build, data, elem); err != nil {
-			return err
+			return fmt.Errorf("set a codebuild.StartBuildInput: %w", err)
 		}
 		return nil
 	}
 
 	buildInput.Batched = true
-	if err := handler.setListBatchBuildInput(buildInput.BatchBuild, repo, buildspec, data, listElems); err != nil {
-		return err
+	if err := handler.setListBatchBuildInput(buildInput.BatchBuild, buildspec, data, listElems); err != nil {
+		return fmt.Errorf("set codebuild.StartBuildBatchInput: %w", err)
 	}
 	return nil
 }
 
-func (handler *Handler) setListBatchBuildInput(input *codebuild.StartBuildBatchInput, repo config.Repository, buildspec bspec.Buildspec, data *Data, listElems []bspec.ListElement) error {
+func (handler *Handler) setListBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data, listElems []bspec.ListElement) error {
 	buildspec.Batch.BuildList = listElems
 	builtContent, err := yaml.Marshal(buildspec)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal a buildspec: %w", err)
 	}
 
 	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
@@ -63,8 +62,6 @@ func (handler *Handler) setListBatchBuildInput(input *codebuild.StartBuildBatchI
 	}
 
 	input.BuildspecOverride = aws.String(string(builtContent))
-	input.ProjectName = aws.String(repo.CodeBuild.ProjectName)
-	input.SourceVersion = aws.String(data.SHA)
 	input.EnvironmentVariablesOverride = envs
 
 	return nil

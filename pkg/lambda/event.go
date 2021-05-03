@@ -2,6 +2,7 @@ package lambda
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 
 	"github.com/antonmedv/expr"
@@ -50,7 +51,7 @@ type Data struct {
 }
 
 func runExpr(prog *vm.Program, data *Data) (interface{}, error) {
-	return expr.Run(prog, setExprFuncs(map[string]interface{}{
+	result, err := expr.Run(prog, setExprFuncs(map[string]interface{}{
 		"event":            data.Event,
 		"repo":             data.Repository,
 		"sha":              data.SHA,
@@ -63,6 +64,10 @@ func runExpr(prog *vm.Program, data *Data) (interface{}, error) {
 		"getPRFileNames":   data.GetPRFileNames,
 		"getPRLabelNames":  data.GetPRLabelNames,
 	}))
+	if err != nil {
+		return nil, fmt.Errorf("evaluate a expr's compiled program: %w", err)
+	}
+	return result, nil
 }
 
 func setExprFuncs(env map[string]interface{}) map[string]interface{} {

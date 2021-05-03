@@ -58,7 +58,7 @@ func getPRFiles(ctx context.Context, client *github.Client, owner, repo string, 
 		}
 		files, resp, err := client.PullRequests.ListFiles(ctx, owner, repo, prNum, opts)
 		if err != nil {
-			return files, resp, err
+			return files, resp, fmt.Errorf("get pull request files (page: %d, per_page: %d): %w", opts.Page, opts.PerPage, err)
 		}
 		gResp = resp
 		ret = append(ret, files...)

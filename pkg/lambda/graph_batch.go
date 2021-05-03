@@ -8,11 +8,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
-	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
+func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
 	elems, err := handler.extractGraph(logE, data, buildspec.Batch.BuildGraph)
 	if err != nil {
 		return err
@@ -27,14 +26,14 @@ func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, 
 		elem := elems[0]
 		buildInput.Build.BuildspecOverride = aws.String(elem.Buildspec)
 		if err := handler.setGraphBuildInput(buildInput.Build, data, elem); err != nil {
-			return err
+			return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 		}
 		return nil
 	}
 
 	buildInput.Batched = true
-	if err := handler.setGraphBatchBuildInput(buildInput.BatchBuild, repo, buildspec, data, elems); err != nil {
-		return err
+	if err := handler.setGraphBatchBuildInput(buildInput.BatchBuild, buildspec, data, elems); err != nil {
+		return fmt.Errorf("set codebuild.StartBuildBatchInput: %w", err)
 	}
 	return nil
 }
@@ -87,11 +86,11 @@ func (handler *Handler) extractGraph(logE *logrus.Entry, data *Data, allElems []
 	return elems, nil
 }
 
-func (handler *Handler) setGraphBatchBuildInput(input *codebuild.StartBuildBatchInput, repo config.Repository, buildspec bspec.Buildspec, data *Data, elems []bspec.GraphElement) error {
+func (handler *Handler) setGraphBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data, elems []bspec.GraphElement) error {
 	buildspec.Batch.BuildGraph = elems
 	builtContent, err := yaml.Marshal(buildspec)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal a buildspec: %w", err)
 	}
 
 	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
@@ -111,8 +110,6 @@ func (handler *Handler) setGraphBatchBuildInput(input *codebuild.StartBuildBatch
 	}
 
 	input.BuildspecOverride = aws.String(string(builtContent))
-	input.ProjectName = aws.String(repo.CodeBuild.ProjectName)
-	input.SourceVersion = aws.String(data.SHA)
 	input.EnvironmentVariablesOverride = envs
 
 	return nil

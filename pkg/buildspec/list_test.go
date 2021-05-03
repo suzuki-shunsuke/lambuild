@@ -8,6 +8,7 @@ import (
 )
 
 func TestListElement_UnmarshalYAML(t *testing.T) {
+	t.Parallel()
 	data := []struct {
 		title string
 		src   string
@@ -22,6 +23,7 @@ identifier: validate
 	for _, d := range data {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
 			elem := buildspec.ListElement{}
 			if err := yaml.Unmarshal([]byte(d.src), &elem); err != nil {
 				t.Fatal(err)

@@ -8,6 +8,7 @@ import (
 )
 
 func TestHook_UnmarshalYAML(t *testing.T) {
+	t.Parallel()
 	data := []struct {
 		title string
 		src   string
@@ -22,6 +23,7 @@ config: foo.yaml
 	for _, d := range data {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
 			hook := config.Hook{}
 			if err := yaml.Unmarshal([]byte(d.src), &hook); err != nil {
 				t.Fatal(err)

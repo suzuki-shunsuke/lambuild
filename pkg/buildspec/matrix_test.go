@@ -8,6 +8,7 @@ import (
 )
 
 func TestExprList_UnmarshalYAML(t *testing.T) {
+	t.Parallel()
 	data := []struct {
 		title string
 		src   string
@@ -23,6 +24,7 @@ func TestExprList_UnmarshalYAML(t *testing.T) {
 	for _, d := range data {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
 			list := buildspec.ExprList{}
 			if err := yaml.Unmarshal([]byte(d.src), &list); err != nil {
 				t.Fatal(err)

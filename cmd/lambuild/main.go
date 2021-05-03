@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -34,7 +35,7 @@ func core() error {
 	ctx := context.Background()
 	handler := lmb.Handler{}
 	if err := handler.Init(ctx); err != nil {
-		return err
+		return fmt.Errorf("initialize the Lambda Function: %w", err)
 	}
 	lambda.Start(handler.Do)
 	return nil

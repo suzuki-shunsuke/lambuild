@@ -32,7 +32,7 @@ func (handler *Handler) readSecretFromSSM(ctx context.Context, sess *session.Ses
 }
 
 func (handler *Handler) getSecret(ctx context.Context, svc *ssm.SSM, key string) (string, error) {
-	out, err := svc.GetParameter(&ssm.GetParameterInput{
+	out, err := svc.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name:           aws.String(key),
 		WithDecryption: aws.Bool(true),
 	})

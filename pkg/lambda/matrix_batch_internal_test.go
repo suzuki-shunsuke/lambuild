@@ -7,6 +7,7 @@ import (
 )
 
 func Test_handler_handleMatrix(t *testing.T) {
+	t.Parallel()
 	data := []struct {
 		title      string
 		data       Data
@@ -37,6 +38,7 @@ func Test_handler_handleMatrix(t *testing.T) {
 	for _, d := range data {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
 			exp, err := expr.Compile(d.expression, expr.AsBool())
 			if err != nil {
 				t.Fatal(err)
@@ -46,7 +48,7 @@ func Test_handler_handleMatrix(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			f := a.(bool)
+			f := a.(bool) //nolint:forcetypeassert
 			if (f && !d.exp) || (!f && d.exp) {
 				t.Fatalf("wanted %v, got %v", d.exp, f)
 			}
