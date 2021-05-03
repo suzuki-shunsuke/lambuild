@@ -43,34 +43,14 @@ func (handler *Handler) handleGraph(ctx context.Context, logE *logrus.Entry, dat
 		}).Info("start a build")
 		return nil
 	}
-	buildspec.Batch.BuildGraph = elems
-	builtContent, err := yaml.Marshal(buildspec)
-	if err != nil {
+
+	input := &codebuild.StartBuildBatchInput{}
+
+	if err := handler.setGraphBatchBuildInput(input, repo, buildspec, data, elems); err != nil {
 		return err
 	}
 
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
-	for k, prog := range data.Lambuild.Env.Variables {
-		a, err := runExpr(prog, data)
-		if err != nil {
-			return err
-		}
-		s, ok := a.(string)
-		if !ok {
-			return errors.New("the evaluated result must be string: lambuild.env." + k)
-		}
-		envs = append(envs, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(s),
-		})
-	}
-
-	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, &codebuild.StartBuildBatchInput{
-		BuildspecOverride:            aws.String(string(builtContent)),
-		ProjectName:                  aws.String(repo.CodeBuild.ProjectName),
-		SourceVersion:                aws.String(data.SHA),
-		EnvironmentVariablesOverride: envs,
-	})
+	buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, input)
 	if err != nil {
 		return fmt.Errorf("start a batch build: %w", err)
 	}
@@ -126,6 +106,37 @@ func (handler *Handler) extractGraph(logE *logrus.Entry, data *Data, allElems []
 		elems = append(elems, elem)
 	}
 	return elems, nil
+}
+
+func (handler *Handler) setGraphBatchBuildInput(input *codebuild.StartBuildBatchInput, repo config.Repository, buildspec bspec.Buildspec, data *Data, elems []bspec.GraphElement) error {
+	buildspec.Batch.BuildGraph = elems
+	builtContent, err := yaml.Marshal(buildspec)
+	if err != nil {
+		return err
+	}
+
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
+	for k, prog := range data.Lambuild.Env.Variables {
+		a, err := runExpr(prog, data)
+		if err != nil {
+			return err
+		}
+		s, ok := a.(string)
+		if !ok {
+			return errors.New("the evaluated result must be string: lambuild.env." + k)
+		}
+		envs = append(envs, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(s),
+		})
+	}
+
+	input.BuildspecOverride = aws.String(string(builtContent))
+	input.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+	input.SourceVersion = aws.String(data.SHA)
+	input.EnvironmentVariablesOverride = envs
+
+	return nil
 }
 
 func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, data *Data, graphElem bspec.GraphElement) error {
