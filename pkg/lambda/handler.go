@@ -33,6 +33,7 @@ type Handler struct {
 	ErrorNotificationTemplate *template.Template
 }
 
+// Do is the Lambda Function's endpoint.
 func (handler *Handler) Do(ctx context.Context, event Event) error {
 	if err := github.ValidateSignature(event.Headers.Signature, []byte(event.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
 		// TODO return 400
@@ -46,7 +47,8 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 	event.Payload = body
 
 	data := &Data{
-		Event: event,
+		Event:  event,
+		GitHub: handler.GitHub,
 	}
 
 	if event.Headers.Event != "push" && event.Headers.Event != "pull_request" {
@@ -76,8 +78,11 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 			Name:     repo.GetName(),
 		}
 		data.SHA = prEvent.GetAfter()
-		handler.setPullRequest(data, pr)
+		data.Ref = pr.GetHead().GetRef()
+		data.PullRequest.LabelNames = extractLabelNames(pr.Labels)
+		data.PullRequest.PullRequest = pr
 	}
+	data.Repository.Owner = strings.Split(data.Repository.FullName, "/")[0]
 	if err := handler.handleEvent(ctx, data); err != nil {
 		handler.sendErrorNotificaiton(ctx, err, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.SHA)
 		return err
@@ -85,6 +90,8 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 	return nil
 }
 
+// getRepo returns the configuration of given repository name.
+// If no configuration is found, the second returned value is false.
 func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
 	for _, repo := range handler.Config.Repositories {
 		if repo.Name == repoName {
@@ -94,7 +101,8 @@ func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
 	return config.Repository{}, false
 }
 
-func (handler *Handler) matchHook(data *Data, repo config.Repository, hook config.Hook) (bool, error) {
+// matchHook returns true if data matches hook's condition.
+func (handler *Handler) matchHook(data *Data, hook config.Hook) (bool, error) {
 	if hook.If == nil {
 		return true, nil
 	}
@@ -107,7 +115,7 @@ func (handler *Handler) matchHook(data *Data, repo config.Repository, hook confi
 
 func (handler *Handler) getHook(data *Data, repo config.Repository) (config.Hook, bool, error) {
 	for _, hook := range repo.Hooks {
-		f, err := handler.matchHook(data, repo, hook)
+		f, err := handler.matchHook(data, hook)
 		if err != nil {
 			return config.Hook{}, false, err
 		}
@@ -119,8 +127,6 @@ func (handler *Handler) getHook(data *Data, repo config.Repository) (config.Hook
 }
 
 func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
-	data.Repository.Owner = strings.Split(data.Repository.FullName, "/")[0]
-	data.GitHub = handler.GitHub
 	logE := logrus.WithFields(logrus.Fields{
 		"repo_full_name": data.Repository.FullName,
 		"repo_owner":     data.Repository.Owner,
@@ -180,13 +186,7 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 	return nil
 }
 
-func (handler *Handler) setPullRequest(data *Data, pr *github.PullRequest) {
-	data.Ref = pr.GetHead().GetRef()
-	data.PullRequest.LabelNames = extractLabelNames(pr.Labels)
-	data.PullRequest.PullRequest = pr
-}
-
-const errorNotificationTemplate = `
+const defaultErrorNotificationTemplate = `
 lambuild failed to procceed the request.
 Please check.
 
@@ -194,6 +194,9 @@ Please check.
 {{.Error}}
 ` + "```"
 
+// sendErrorNotificaiton sends a comment to GitHub PullRequest or commit to notify an error.
+// If prNumber isn't zero a comment is sent to the pull reqquest.
+// If prNumber is zero, which means the event isn't associated with any pull request, a comment is sent to a comment.
 func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repoOwner, repoName string, prNumber int, sha string) {
 	logE := logrus.WithFields(logrus.Fields{
 		"original_error": e,
@@ -202,6 +205,7 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 		"pr_number":      prNumber,
 		"sha":            sha,
 	})
+
 	// generate a comment
 	buf := &bytes.Buffer{}
 	cmt := ""
@@ -213,7 +217,9 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 	} else {
 		cmt = buf.String()
 	}
+
 	if prNumber == 0 {
+		// send a comment to commit
 		if _, _, cmtErr := handler.GitHub.Repositories.CreateComment(ctx, repoOwner, repoName, sha, &github.RepositoryComment{
 			Body: github.String(cmt),
 		}); cmtErr != nil {
@@ -222,6 +228,7 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 		logE.Info("send a comment to the commit")
 		return
 	}
+
 	// send a comment to pull request
 	if _, _, cmtErr := handler.GitHub.Issues.CreateComment(ctx, repoOwner, repoName, prNumber, &github.IssueComment{
 		Body: github.String(cmt),
@@ -279,20 +286,10 @@ func (handler *Handler) Init(ctx context.Context) error {
 	if err := handler.readSecretFromSSM(ctx, sess, secretNameGitHubToken, secretNameWebhookSecret); err != nil {
 		return err
 	}
-	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		lvl, err := logrus.ParseLevel(logLevel)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"log_level": logLevel,
-			}).WithError(err).Error("the log level is invalid")
-		} else {
-			logrus.SetLevel(lvl)
-		}
-	}
 
 	errTpl := os.Getenv("ERROR_NOTIFICATION_TEMPLATE")
 	if errTpl == "" {
-		errTpl = errorNotificationTemplate
+		errTpl = defaultErrorNotificationTemplate
 	}
 
 	tpl, err := template.New("_").Parse(errTpl)

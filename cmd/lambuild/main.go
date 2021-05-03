@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/sirupsen/logrus"
@@ -10,8 +11,22 @@ import (
 
 func main() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
+	setLogLevel()
 	if err := core(); err != nil {
 		logrus.Fatal(err)
+	}
+}
+
+func setLogLevel() {
+	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
+		lvl, err := logrus.ParseLevel(logLevel)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"log_level": logLevel,
+			}).WithError(err).Error("the log level is invalid")
+		} else {
+			logrus.SetLevel(lvl)
+		}
 	}
 }
 
