@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"log"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/sirupsen/logrus"
 	lmb "github.com/suzuki-shunsuke/lambuild/pkg/lambda"
 )
 
 func main() {
+	logrus.SetFormatter(&logrus.JSONFormatter{})
 	if err := core(); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }
 
