@@ -21,6 +21,14 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const defaultErrorNotificationTemplate = `
+lambuild failed to procceed the request.
+Please check.
+
+` + "```" + `
+{{.Error}}
+` + "```"
+
 type Handler struct {
 	Config                    config.Config
 	Secret                    Secret
@@ -113,6 +121,8 @@ func (handler *Handler) matchHook(data *Data, hook config.Hook) (bool, error) {
 	return f.(bool), nil
 }
 
+// getHook returns a hook configuration which data matches.
+// If data doesn't match any configuration, the second returned value is false.
 func (handler *Handler) getHook(data *Data, repo config.Repository) (config.Hook, bool, error) {
 	for _, hook := range repo.Hooks {
 		f, err := handler.matchHook(data, hook)
@@ -124,6 +134,38 @@ func (handler *Handler) getHook(data *Data, repo config.Repository) (config.Hook
 		}
 	}
 	return config.Hook{}, false, nil
+}
+
+// getConfigFromRepo gets the configuration file from the target repository
+func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entry, data *Data, hook config.Hook) (bspec.Buildspec, error) {
+	buildspec := bspec.Buildspec{}
+	// get the configuration file from the target repository
+	if hook.Config == "" {
+		// set the default value
+		hook.Config = "lambuild.yaml"
+	}
+	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, hook.Config, &github.RepositoryContentGetOptions{Ref: data.Ref})
+	if err != nil {
+		logE.WithFields(logrus.Fields{
+			"path": hook.Config,
+		}).WithError(err).Error("get the configuration file")
+		return buildspec, nil
+	}
+	if file == nil {
+		logE.Warn("downloaded file is nil")
+		return buildspec, nil
+	}
+	content, err := file.GetContent()
+	if err != nil {
+		return buildspec, fmt.Errorf("get a content: %w", err)
+	}
+
+	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
+		return buildspec, fmt.Errorf("unmarshal a buildspec: %w", err)
+	}
+	data.Lambuild = buildspec.Lambuild
+	buildspec.Lambuild = bspec.Lambuild{}
+	return buildspec, nil
 }
 
 func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
@@ -152,26 +194,11 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 		"config": hook.Config,
 	})
 
-	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, hook.Config, &github.RepositoryContentGetOptions{Ref: data.Ref})
+	// get the configuration file from the target repository
+	buildspec, err := handler.getConfigFromRepo(ctx, logE, data, hook)
 	if err != nil {
-		logE.WithError(err).Debug("no content is found")
-		return nil
+		return err
 	}
-	if file == nil {
-		logE.Warn("downloaded file is nil")
-		return nil
-	}
-	content, err := file.GetContent()
-	if err != nil {
-		return fmt.Errorf("get a content: %w", err)
-	}
-
-	buildspec := bspec.Buildspec{}
-	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
-		return fmt.Errorf("unmarshal a buildspec: %w", err)
-	}
-	data.Lambuild = buildspec.Lambuild
-	buildspec.Lambuild = bspec.Lambuild{}
 
 	if len(buildspec.Batch.BuildGraph) != 0 {
 		return handler.handleGraph(ctx, logE, data, buildspec, repo)
@@ -185,14 +212,6 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 
 	return nil
 }
-
-const defaultErrorNotificationTemplate = `
-lambuild failed to procceed the request.
-Please check.
-
-` + "```" + `
-{{.Error}}
-` + "```"
 
 // sendErrorNotificaiton sends a comment to GitHub PullRequest or commit to notify an error.
 // If prNumber isn't zero a comment is sent to the pull reqquest.
