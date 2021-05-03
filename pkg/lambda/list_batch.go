@@ -1,7 +1,6 @@
 package lambda
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -13,28 +12,6 @@ import (
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"gopkg.in/yaml.v2"
 )
-
-func (handler *Handler) setBuildStatusContext(data *Data, input *codebuild.StartBuildInput) error {
-	if handler.BuildStatusContext == nil {
-		return nil
-	}
-	buf := &bytes.Buffer{}
-	if err := handler.BuildStatusContext.Execute(buf, map[string]interface{}{
-		"event":         data.Event,
-		"pr":            data.PullRequest,
-		"repo":          data.Repository,
-		"sha":           data.SHA,
-		"ref":           data.Ref,
-		"commit":        data.GetCommit,
-		"commitMessage": data.CommitMessage,
-	}); err != nil {
-		return fmt.Errorf("render a build status context: %w", err)
-	}
-	input.BuildStatusConfigOverride = &codebuild.BuildStatusConfig{
-		Context: aws.String(buf.String()),
-	}
-	return nil
-}
 
 func (handler *Handler) handleList(ctx context.Context, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec, repo config.Repository) error {
 	listElems := []bspec.ListElement{}
