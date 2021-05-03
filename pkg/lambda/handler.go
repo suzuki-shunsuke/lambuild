@@ -50,6 +50,8 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 	}
 
 	if event.Headers.Event != "push" && event.Headers.Event != "pull_request" {
+		// Events other than "push" and "pull_request" aren't supported.
+		// These events are ignored.
 		return nil
 	}
 
