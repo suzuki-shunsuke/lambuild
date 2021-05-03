@@ -50,6 +50,7 @@ GitHub Webhook => API Gateway => Lambda => CodeBuild
 
 * LOG_LEVEL
 * BUILD_STATUS_CONTEXT
+* ERROR_NOTIFICATION_TEMPLATE
 
 ### AWS Systems Manager Parameter Store
 
@@ -67,20 +68,13 @@ repositories:
     codebuild:
       project-name: test-lambuild
     hooks:
-      - event:
-          - push
-        ref: |
-          equal refs/heads/master
-          equal refs/heads/feat/first-pr
+      - if: |
+          event.Headers.Event == "push" and
+          (ref in ["refs/heads/master", "refs/heads/feat/first-pr"])
         config: lambuild.yaml
-      - event:
-          - pull_request
-        base-ref: |
-          equal master
-        author: |
-          equal renovate[bot]
-        label: |
-          equal terraform-provider
+      - if: |
+          event.Headers.Event == "pull_request" and
+          (getPR().GetHead().GetRef() in ["feat/first-pr"])
         config: lambuild.yaml
 ```
 
@@ -100,24 +94,8 @@ batch:
   build-graph:
     - identifier: validate_renovate
       buildspec: buildspec/validate-renovate.yaml
-      lambuild:
-        filter:
-          - event:
-              - push
+      if: event.Headers.Event == "pull_request"
 ```
-
-### Built in environment variables
-
-The following environment variables are added to buildspec.
-
-* LAMBUILD_WEBHOOK_BODY
-* LAMBUILD_WEBHOOK_EVENT
-* LAMBUILD_WEBHOOK_DELIVERY
-* LAMBUILD_HEAD_COMMIT_MSG
-
-### Matchfile filter
-
-[matchfile-parser](https://github.com/suzuki-shunsuke/matchfile-parser) is used to filter requests and Batch Build's build.
 
 ## LICENSE
 
