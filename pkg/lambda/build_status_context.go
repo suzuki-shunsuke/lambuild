@@ -3,17 +3,29 @@ package lambda
 import (
 	"bytes"
 	"fmt"
+	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 )
 
 func (handler *Handler) setBuildStatusContext(data *Data, input *codebuild.StartBuildInput) error {
-	if handler.BuildStatusContext == nil {
-		return nil
+	s, err := getBuildStatusContext(handler.BuildStatusContext, data)
+	if err != nil || s == "" {
+		return err
+	}
+	input.BuildStatusConfigOverride = &codebuild.BuildStatusConfig{
+		Context: aws.String(s),
+	}
+	return nil
+}
+
+func getBuildStatusContext(tpl *template.Template, data *Data) (string, error) {
+	if tpl == nil {
+		return "", nil
 	}
 	buf := &bytes.Buffer{}
-	if err := handler.BuildStatusContext.Execute(buf, map[string]interface{}{
+	if err := tpl.Execute(buf, map[string]interface{}{
 		"event":         data.Event,
 		"pr":            data.PullRequest,
 		"repo":          data.Repository,
@@ -22,10 +34,7 @@ func (handler *Handler) setBuildStatusContext(data *Data, input *codebuild.Start
 		"commit":        data.GetCommit,
 		"commitMessage": data.CommitMessage,
 	}); err != nil {
-		return fmt.Errorf("render a build status context: %w", err)
+		return "", fmt.Errorf("render a build status context: %w", err)
 	}
-	input.BuildStatusConfigOverride = &codebuild.BuildStatusConfig{
-		Context: aws.String(buf.String()),
-	}
-	return nil
+	return buf.String(), nil
 }
