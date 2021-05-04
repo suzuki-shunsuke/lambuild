@@ -32,20 +32,14 @@ func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, d
 	}
 
 	buildInput.Batched = true
-	if err := handler.setListBatchBuildInput(buildInput.BatchBuild, buildspec, data, listElems); err != nil {
+	buildspec.Batch.BuildList = listElems
+	if err := handler.setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildBatchInput: %w", err)
 	}
 	return nil
 }
 
-func (handler *Handler) setListBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data, listElems []bspec.ListElement) error {
-	buildspec.Batch.BuildList = listElems
-	builtContent, err := yaml.Marshal(buildspec)
-	if err != nil {
-		return fmt.Errorf("marshal a buildspec: %w", err)
-	}
-
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
+func (handler *Handler) setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data) error {
 	for k, prog := range data.Lambuild.Env.Variables {
 		a, err := runExpr(prog, data)
 		if err != nil {
@@ -55,14 +49,14 @@ func (handler *Handler) setListBatchBuildInput(input *codebuild.StartBuildBatchI
 		if !ok {
 			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
-		envs = append(envs, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(s),
-		})
+		buildspec.Env.Variables[k] = s
 	}
 
+	builtContent, err := yaml.Marshal(buildspec)
+	if err != nil {
+		return fmt.Errorf("marshal a buildspec: %w", err)
+	}
 	input.BuildspecOverride = aws.String(string(builtContent))
-	input.EnvironmentVariablesOverride = envs
 
 	return nil
 }

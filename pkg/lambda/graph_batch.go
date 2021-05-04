@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
-	"gopkg.in/yaml.v2"
 )
 
 func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
@@ -32,7 +31,8 @@ func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, 
 	}
 
 	buildInput.Batched = true
-	if err := handler.setGraphBatchBuildInput(buildInput.BatchBuild, buildspec, data, elems); err != nil {
+	buildspec.Batch.BuildGraph = elems
+	if err := handler.setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildBatchInput: %w", err)
 	}
 	return nil
@@ -84,35 +84,6 @@ func (handler *Handler) extractGraph(logE *logrus.Entry, data *Data, allElems []
 		elems = append(elems, elem)
 	}
 	return elems, nil
-}
-
-func (handler *Handler) setGraphBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data, elems []bspec.GraphElement) error {
-	buildspec.Batch.BuildGraph = elems
-	builtContent, err := yaml.Marshal(buildspec)
-	if err != nil {
-		return fmt.Errorf("marshal a buildspec: %w", err)
-	}
-
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
-	for k, prog := range data.Lambuild.Env.Variables {
-		a, err := runExpr(prog, data)
-		if err != nil {
-			return err
-		}
-		s, ok := a.(string)
-		if !ok {
-			return errors.New("the evaluated result must be string: lambuild.env." + k)
-		}
-		envs = append(envs, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(s),
-		})
-	}
-
-	input.BuildspecOverride = aws.String(string(builtContent))
-	input.EnvironmentVariablesOverride = envs
-
-	return nil
 }
 
 func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, data *Data, graphElem bspec.GraphElement) error {
