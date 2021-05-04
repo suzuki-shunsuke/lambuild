@@ -343,10 +343,10 @@ func (handler *Handler) Init(ctx context.Context) error {
 		return errors.New("the environment variable 'SSM_PARAMETER_NAME_WEBHOOK_SECRET' is required")
 	}
 
-	if context := os.Getenv("BUILD_STATUS_CONTEXT"); context != "" {
-		tpl, err := template.New("_").Funcs(sprig.TxtFuncMap()).Parse(context)
+	if cntxt := os.Getenv("BUILD_STATUS_CONTEXT"); cntxt != "" {
+		tpl, err := template.New("_").Funcs(sprig.TxtFuncMap()).Parse(cntxt)
 		if err != nil {
-			return fmt.Errorf("parse BUILD_STATUS_CONTEXT as template (%s): %w", context, err)
+			return fmt.Errorf("parse BUILD_STATUS_CONTEXT as template (%s): %w", cntxt, err)
 		}
 		handler.BuildStatusContext = tpl
 	}
