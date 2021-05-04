@@ -107,3 +107,14 @@ path | type | example | description
 --- | --- | --- | ---
 .value | string | |
 .if | string (expr's expression) | |
+
+---
+
+When `build-list` and `build-graph`'s all builds are removed by `if` condition, then no build is started.
+
+In case of `build-matrix`, when all configuration (buildspec, compute-type, image, variables) are removed by `if` condition, then no build is started.
+
+After filtering builds by `if` condition, if the number of remaining builds is one,
+then `lambuild` calls CodeBuild `StartBuild` API instead of `StartBuildBatch` API,
+which means `lambuild` starts not Batch Build but Build.
+Batch Build has some overhead, so `lambuild` starts Build instead of Batch Build to decrease the Build time.
