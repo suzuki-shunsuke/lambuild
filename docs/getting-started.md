@@ -5,7 +5,7 @@
 * GitHub Account
 * AWS Account
 
-## Prepare
+## Procedure
 
 * Create a GitHub repository for getting started
 * [Create a CodeBuild Project](https://docs.aws.amazon.com/codebuild/latest/userguide/create-project.html)
