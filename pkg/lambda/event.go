@@ -1,9 +1,7 @@
 package lambda
 
 import (
-	"context"
 	"fmt"
-	"regexp"
 
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
@@ -38,6 +36,8 @@ type Repository struct {
 	Name     string
 }
 
+// Data contains data which is referred in expression engine and template engine.
+// To reduce unneeded HTTP API call, in Data's many functions API isn't called until the API call is really needed, and the result is cached in the request scope.
 type Data struct {
 	Event             Event
 	PullRequest       PullRequest
@@ -70,72 +70,11 @@ func runExpr(prog *vm.Program, data *Data) (interface{}, error) {
 	return result, nil
 }
 
-func setExprFuncs(env map[string]interface{}) map[string]interface{} {
-	env["regexp"] = map[string]interface{}{
-		"match": func(pattern, s string) bool {
-			f, err := regexp.MatchString(pattern, s)
-			if err != nil {
-				panic(err)
-			}
-			return f
-		},
-	}
-	return env
-}
-
 func (data *Data) CommitMessage() string {
 	if data.HeadCommitMessage == "" {
 		data.HeadCommitMessage = data.GetCommit().GetMessage()
 	}
 	return data.HeadCommitMessage
-}
-
-func (data *Data) GetCommit() *github.Commit {
-	if data.Commit == nil {
-		commit, _, err := data.GitHub.Git.GetCommit(context.Background(), data.Repository.Owner, data.Repository.Name, data.SHA)
-		if err != nil {
-			panic(err)
-		}
-		data.Commit = commit
-	}
-	return data.Commit
-}
-
-func (data *Data) GetPRNumber() int {
-	if data.PullRequest.Number == 0 {
-		if data.PullRequest.PullRequest != nil {
-			data.PullRequest.Number = data.PullRequest.PullRequest.GetNumber()
-			return data.PullRequest.Number
-		}
-		n, err := getPRNumber(context.Background(), data.Repository.Owner, data.Repository.Name, data.SHA, data.GitHub)
-		if err != nil {
-			panic(err)
-		}
-		data.PullRequest.Number = n
-	}
-	return data.PullRequest.Number
-}
-
-func (data *Data) GetPR() *github.PullRequest {
-	if data.PullRequest.PullRequest == nil {
-		pr, _, err := data.GitHub.PullRequests.Get(context.Background(), data.Repository.Owner, data.Repository.Name, data.GetPRNumber())
-		if err != nil {
-			panic(err)
-		}
-		data.PullRequest.PullRequest = pr
-	}
-	return data.PullRequest.PullRequest
-}
-
-func (data *Data) GetPRFiles() []*github.CommitFile {
-	if data.PullRequest.Files == nil {
-		files, _, err := getPRFiles(context.Background(), data.GitHub, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.GetPR().GetChangedFiles())
-		if err != nil {
-			panic(err)
-		}
-		data.PullRequest.Files = files
-	}
-	return data.PullRequest.Files
 }
 
 func (data *Data) GetPRFileNames() []string {
