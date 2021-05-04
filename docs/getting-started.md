@@ -28,7 +28,20 @@
 
 ### Lambda Function
 
+e.g.
+
 ```yaml
+repositories:
+  - name: suzuki-shunsuke/test-lambuild
+    codebuild:
+      project-name: test-lambuild
+    hooks:
+      - if: |
+          event.Headers.Event == "push" and
+          ref == "refs/heads/main"
+      - if: |
+          event.Headers.Event == "pull_request" and
+          event.Payload.GetAction() in ["opened", "edited", "reopend"]
 ```
 
 ### lambuild.yaml
