@@ -6,8 +6,8 @@ The following parameters are passed to expressions.
 
 .path | type | example | description
 --- | --- | --- | ---
-.event | Event | |
-.repo | Repository | |
+.event | [Event](#type-event) | |
+.repo | [Repository](#type-repository) | |
 .sha | string | |
 .ref | string | |
 .getCommit | `func() *github.Commit` | |
@@ -36,7 +36,7 @@ This is the reason why the type of parameters like `getPRFileNames` is function.
 .path | type | example | description
 --- | --- | --- | ---
 .Body | string | | GitHub Webhook's payload
-.Headers | Headers | | [GitHub Webhook's Delivery headers](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#delivery-headers)
+.Headers | [Headers](#type-headers) | | [GitHub Webhook's Delivery headers](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#delivery-headers)
 .Payload | interface{} | | [*github.PullRequestEvent](https://pkg.go.dev/github.com/google/go-github/v35/github#PullRequestEvent) or [*github.PushEvent](https://pkg.go.dev/github.com/google/go-github/v35/github#PushEvent)
 
 ## Type: Headers

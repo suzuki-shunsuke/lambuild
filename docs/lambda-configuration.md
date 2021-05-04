@@ -67,4 +67,4 @@ ERROR_NOTIFICATION_TEMPLATE's parameter
 
 path | type | example | description
 --- | --- | --- | ---
-.Error | error | |
+.Error | Go's error | |
