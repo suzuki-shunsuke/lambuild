@@ -10,42 +10,69 @@ import (
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 )
 
-func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
-	buildspecs, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Buildspec)
-	if err != nil {
-		return fmt.Errorf("filter buildspecs: %w", err)
-	}
-	buildspec.Batch.BuildMatrix.Dynamic.Buildspec = buildspecs
-
-	images, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Env.Image)
-	if err != nil {
-		return fmt.Errorf("filter images: %w", err)
-	}
-	buildspec.Batch.BuildMatrix.Dynamic.Env.Image = images
-
-	computeTypes, err := handler.filterExprList(data, buildspec.Batch.BuildMatrix.Dynamic.Env.ComputeType)
-	if err != nil {
-		return fmt.Errorf("filter compute-type: %w", err)
-	}
-	buildspec.Batch.BuildMatrix.Dynamic.Env.ComputeType = computeTypes
-
-	envVars := make(map[string]bspec.ExprList, len(buildspec.Batch.BuildMatrix.Dynamic.Env.Variables))
-	for k, v := range buildspec.Batch.BuildMatrix.Dynamic.Env.Variables {
-		vars, err := handler.filterExprList(data, v)
+func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error { //nolint:gocognit
+	dynamic := buildspec.Batch.BuildMatrix.Dynamic
+	if len(dynamic.Buildspec) != 0 {
+		buildspecs, err := handler.filterExprList(data, dynamic.Buildspec)
 		if err != nil {
-			return fmt.Errorf("filter env.variables: %w", err)
+			return fmt.Errorf("filter buildspecs: %w", err)
 		}
-		envVars[k] = vars
-	}
-	buildspec.Batch.BuildMatrix.Dynamic.Env.Variables = envVars
-
-	if len(buildspecs) == 0 && len(images) == 0 && len(computeTypes) == 0 && getSizeOfEnvVars(envVars) == 0 {
-		logE.Info("no matrix element is run")
-		buildInput.Empty = true
-		return nil
+		if len(buildspecs) == 0 {
+			buildInput.Empty = true
+			logE.Info("all buildspec are ignored, so build isn't run")
+			return nil
+		}
+		dynamic.Buildspec = buildspecs
 	}
 
-	if len(buildspecs) > 1 || len(images) > 1 || len(computeTypes) > 1 || getSizeOfEnvVars(envVars) > 1 {
+	if len(dynamic.Env.Image) != 0 {
+		images, err := handler.filterExprList(data, dynamic.Env.Image)
+		if err != nil {
+			return fmt.Errorf("filter images: %w", err)
+		}
+		if len(images) == 0 {
+			buildInput.Empty = true
+			logE.Info("all image are ignored, so build isn't run")
+			return nil
+		}
+		dynamic.Env.Image = images
+	}
+
+	if len(dynamic.Env.ComputeType) != 0 {
+		computeTypes, err := handler.filterExprList(data, dynamic.Env.ComputeType)
+		if err != nil {
+			return fmt.Errorf("filter compute-type: %w", err)
+		}
+		if len(computeTypes) == 0 {
+			buildInput.Empty = true
+			logE.Info("all compute-type are ignored, so build isn't run")
+			return nil
+		}
+		dynamic.Env.ComputeType = computeTypes
+	}
+
+	if len(dynamic.Env.Variables) != 0 {
+		envVars := make(map[string]bspec.ExprList, len(dynamic.Env.Variables))
+		for k, v := range dynamic.Env.Variables {
+			vars, err := handler.filterExprList(data, v)
+			if err != nil {
+				return fmt.Errorf("filter env.variables: %w", err)
+			}
+			if len(vars) == 0 {
+				buildInput.Empty = true
+				logE.WithFields(logrus.Fields{
+					"env_name": k,
+				}).Info("all environment variable are ignored, so build isn't run")
+				return nil
+			}
+			envVars[k] = vars
+		}
+		dynamic.Env.Variables = envVars
+	}
+
+	buildspec.Batch.BuildMatrix.Dynamic = dynamic
+
+	if len(dynamic.Buildspec) > 1 || len(dynamic.Env.Image) > 1 || len(dynamic.Env.ComputeType) > 1 || getSizeOfEnvVars(dynamic.Env.Variables) > 1 {
 		// batch build
 		buildInput.Batched = true
 		if err := handler.setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
@@ -55,7 +82,7 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	}
 
 	// build
-	if err := handler.setMatrixBuildInput(data, buildspecs, images, computeTypes, envVars, buildInput.Build); err != nil {
+	if err := handler.setMatrixBuildInput(data, dynamic, buildInput.Build); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 	}
 
@@ -94,19 +121,19 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 	return size
 }
 
-func (handler *Handler) setMatrixBuildInput(data *Data, buildspecs, images, computeTypes bspec.ExprList, envVars map[string]bspec.ExprList, input *codebuild.StartBuildInput) error {
+func (handler *Handler) setMatrixBuildInput(data *Data, dynamic bspec.MatrixDynamic, input *codebuild.StartBuildInput) error {
 	if err := handler.setBuildStatusContext(data, input); err != nil {
 		return err
 	}
 
-	if len(buildspecs) != 0 {
-		input.BuildspecOverride = aws.String(buildspecs[0].(string))
+	if len(dynamic.Buildspec) != 0 {
+		input.BuildspecOverride = aws.String(dynamic.Buildspec[0].(string))
 	}
-	if len(images) != 0 {
-		input.ImageOverride = aws.String(images[0].(string))
+	if len(dynamic.Env.Image) != 0 {
+		input.ImageOverride = aws.String(dynamic.Env.Image[0].(string))
 	}
-	if len(computeTypes) != 0 {
-		input.ComputeTypeOverride = aws.String(computeTypes[0].(string))
+	if len(dynamic.Env.ComputeType) != 0 {
+		input.ComputeTypeOverride = aws.String(dynamic.Env.ComputeType[0].(string))
 	}
 
 	envMap := make(map[string]string, len(data.Lambuild.Env.Variables))
@@ -121,8 +148,8 @@ func (handler *Handler) setMatrixBuildInput(data *Data, buildspecs, images, comp
 		}
 		envMap[k] = s
 	}
-	if getSizeOfEnvVars(envVars) != 0 {
-		for k, v := range envVars {
+	if getSizeOfEnvVars(dynamic.Env.Variables) != 0 {
+		for k, v := range dynamic.Env.Variables {
 			envMap[k] = v[0].(string) //nolint:forcetypeassert
 		}
 	}
