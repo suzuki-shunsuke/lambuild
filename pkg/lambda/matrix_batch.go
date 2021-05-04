@@ -108,37 +108,9 @@ func (handler *Handler) setMatrixBuildInput(data *Data, buildspecs, images, comp
 	if len(computeTypes) != 0 {
 		input.ComputeTypeOverride = aws.String(computeTypes[0].(string))
 	}
-	if getSizeOfEnvVars(envVars) == 0 {
-		envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
-		for k, prog := range data.Lambuild.Env.Variables {
-			a, err := runExpr(prog, data)
-			if err != nil {
-				return err
-			}
-			s, ok := a.(string)
-			if !ok {
-				return errors.New("the evaluated result must be string: lambuild.env." + k)
-			}
-			envs = append(envs, &codebuild.EnvironmentVariable{
-				Name:  aws.String(k),
-				Value: aws.String(s),
-			})
-		}
-		input.EnvironmentVariablesOverride = envs
-		return nil
-	}
-	list := make([]*codebuild.EnvironmentVariable, 0, len(envVars))
-	for k, v := range envVars {
-		list = append(list, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(v[0].(string)),
-		})
-	}
 
+	envMap := make(map[string]string, len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
-		if _, ok := envVars[k]; ok {
-			continue
-		}
 		a, err := runExpr(prog, data)
 		if err != nil {
 			return err
@@ -147,13 +119,22 @@ func (handler *Handler) setMatrixBuildInput(data *Data, buildspecs, images, comp
 		if !ok {
 			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
-		list = append(list, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(s),
-		})
+		envMap[k] = s
+	}
+	if getSizeOfEnvVars(envVars) != 0 {
+		for k, v := range envVars {
+			envMap[k] = v[0].(string) //nolint:forcetypeassert
+		}
 	}
 
-	input.EnvironmentVariablesOverride = list
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
+	for k, v := range envMap {
+		envs = append(envs, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(v),
+		})
+	}
+	input.EnvironmentVariablesOverride = envs
 
 	return nil
 }

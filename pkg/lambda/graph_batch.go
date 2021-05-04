@@ -86,20 +86,20 @@ func (handler *Handler) extractGraph(logE *logrus.Entry, data *Data, allElems []
 	return elems, nil
 }
 
-func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, data *Data, graphElem bspec.GraphElement) error {
-	if graphElem.DebugSession {
+func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, data *Data, elem bspec.GraphElement) error {
+	if elem.Env.ComputeType != "" {
+		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
+	}
+
+	if elem.DebugSession {
 		input.DebugSessionEnabled = aws.Bool(true)
 	}
 
-	if graphElem.Env.ComputeType != "" {
-		input.ComputeTypeOverride = aws.String(graphElem.Env.ComputeType)
+	if elem.Env.Image != "" {
+		input.ImageOverride = aws.String(elem.Env.Image)
 	}
 
-	if graphElem.Env.Image != "" {
-		input.ImageOverride = aws.String(graphElem.Env.Image)
-	}
-
-	if graphElem.Env.PrivilegedMode {
+	if elem.Env.PrivilegedMode {
 		input.PrivilegedModeOverride = aws.Bool(true)
 	}
 
@@ -107,15 +107,8 @@ func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, dat
 		return err
 	}
 
-	if graphElem.Env.Variables == nil {
-		// initialize a nil map
-		graphElem.Env.Variables = make(map[string]string, len(data.Lambuild.Env.Variables))
-	}
-
+	envMap := make(map[string]string, len(elem.Env.Variables)+len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
-		if _, ok := graphElem.Env.Variables[k]; ok {
-			continue
-		}
 		a, err := runExpr(prog, data)
 		if err != nil {
 			return err
@@ -124,15 +117,20 @@ func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, dat
 		if !ok {
 			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
-		graphElem.Env.Variables[k] = s
+		envMap[k] = s
 	}
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(graphElem.Env.Variables))
-	for k, v := range graphElem.Env.Variables {
+	for k, v := range elem.Env.Variables {
+		envMap[k] = v
+	}
+
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
+	for k, v := range envMap {
 		envs = append(envs, &codebuild.EnvironmentVariable{
 			Name:  aws.String(k),
 			Value: aws.String(v),
 		})
 	}
 	input.EnvironmentVariablesOverride = envs
+
 	return nil
 }

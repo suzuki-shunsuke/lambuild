@@ -39,18 +39,31 @@ func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, d
 	return nil
 }
 
-func (handler *Handler) setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data) error {
+func (handler *Handler) getLambuildEnvVars(data *Data) ([]*codebuild.EnvironmentVariable, error) {
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
 		a, err := runExpr(prog, data)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		s, ok := a.(string)
 		if !ok {
-			return errors.New("the evaluated result must be string: lambuild.env." + k)
+			return nil, errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
-		buildspec.Env.Variables[k] = s
+		envs = append(envs, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(s),
+		})
 	}
+	return envs, nil
+}
+
+func (handler *Handler) setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data) error {
+	envs, err := handler.getLambuildEnvVars(data)
+	if err != nil {
+		return err
+	}
+	input.EnvironmentVariablesOverride = envs
 
 	builtContent, err := yaml.Marshal(buildspec)
 	if err != nil {
@@ -61,16 +74,20 @@ func (handler *Handler) setBatchBuildInput(input *codebuild.StartBuildBatchInput
 	return nil
 }
 
-func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data *Data, listElem bspec.ListElement) error {
-	if listElem.Env.ComputeType != "" {
-		input.ComputeTypeOverride = aws.String(listElem.Env.ComputeType)
+func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data *Data, elem bspec.ListElement) error {
+	if elem.Env.ComputeType != "" {
+		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}
 
-	if listElem.Env.Image != "" {
-		input.ImageOverride = aws.String(listElem.Env.Image)
+	if elem.DebugSession {
+		input.DebugSessionEnabled = aws.Bool(true)
 	}
 
-	if listElem.Env.PrivilegedMode {
+	if elem.Env.Image != "" {
+		input.ImageOverride = aws.String(elem.Env.Image)
+	}
+
+	if elem.Env.PrivilegedMode {
 		input.PrivilegedModeOverride = aws.Bool(true)
 	}
 
@@ -78,17 +95,8 @@ func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data
 		return err
 	}
 
-	if listElem.DebugSession {
-		input.DebugSessionEnabled = aws.Bool(true)
-	}
-
-	if len(listElem.Env.Variables) == 0 {
-		listElem.Env.Variables = make(map[string]string, len(data.Lambuild.Env.Variables))
-	}
+	envMap := make(map[string]string, len(elem.Env.Variables)+len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
-		if _, ok := listElem.Env.Variables[k]; ok {
-			continue
-		}
 		a, err := runExpr(prog, data)
 		if err != nil {
 			return err
@@ -97,16 +105,19 @@ func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data
 		if !ok {
 			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
-		listElem.Env.Variables[k] = s
+		envMap[k] = s
 	}
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(listElem.Env.Variables))
-	for k, v := range listElem.Env.Variables {
+	for k, v := range elem.Env.Variables {
+		envMap[k] = v
+	}
+
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
+	for k, v := range envMap {
 		envs = append(envs, &codebuild.EnvironmentVariable{
 			Name:  aws.String(k),
 			Value: aws.String(v),
 		})
 	}
-
 	input.EnvironmentVariablesOverride = envs
 
 	return nil
