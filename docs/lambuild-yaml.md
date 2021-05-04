@@ -91,7 +91,7 @@ batch:
 
 path | type | example | description
 --- | --- | --- | ---
-.lambuild.env.variables | `map[string]string`. The value of map is expr's expression | | build's environment variables
+.lambuild.env.variables | `map[string]string`. The value of map is expr's expression | | build's environment variables. The environment variables of `.lambuild.env.variables` are passed by `EnvironmentTypeOverride` option
 .batch.build-list[].if | string (expr's expression) | |
 .batch.build-graph[].if | string (expr's expression) | |
 .batch.build-matrix.dynamic.buildspec | ExprList | |
@@ -108,13 +108,12 @@ path | type | example | description
 .value | string | |
 .if | string (expr's expression) | |
 
----
+## Specification to generate buildspec
 
-When `build-list` and `build-graph`'s all builds are removed by `if` condition, then no build is started.
-
-In case of `build-matrix`, when all configuration (buildspec, compute-type, image, variables) are removed by `if` condition, then no build is started.
+When Batch Build's all builds are removed by `if` condition, then no build is started.
 
 After filtering builds by `if` condition, if the number of remaining builds is one,
 then `lambuild` calls CodeBuild `StartBuild` API instead of `StartBuildBatch` API,
 which means `lambuild` starts not Batch Build but Build.
 Batch Build has some overhead, so `lambuild` starts Build instead of Batch Build to decrease the Build time.
+In that case, each build's properties are passed by override option.
