@@ -30,3 +30,29 @@ _Note that the above go-github version may be different from actual version whic
 To avoid unneeded GitHub API call, `lambuild` doesn't call API until the function is called at the expression, and the result is cached in the Lambda Function's request scope.
 
 This is the reason why the type of parameters like `getPRFileNames` is function.
+
+## Type: Event
+
+.path | type | example | description
+--- | --- | --- | ---
+.Body | string | | GitHub Webhook's payload
+.Headers | Headers | | [GitHub Webhook's Delivery headers](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#delivery-headers)
+.Payload | interface{} | | [*github.PullRequestEvent](https://pkg.go.dev/github.com/google/go-github/v35/github#PullRequestEvent) or [*github.PushEvent](https://pkg.go.dev/github.com/google/go-github/v35/github#PushEvent)
+
+## Type: Headers
+
+[GitHub Webhook's Delivery headers](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#delivery-headers)
+
+.path | type | example | description
+--- | --- | --- | ---
+.Event | string | `push` | `x-github-event`
+.Delivery | string | | `x-github-delivery`
+.Signature | string | | `x-hub-signature-256`
+
+## Type: Repository
+
+.path | type | example | description
+--- | --- | --- | ---
+.FullName | string | `suzuki-shunsuke/test-lambuild` |
+.Owner | string | `suzuki-shunsuke` |
+.Name | string | `test-lambuild` |

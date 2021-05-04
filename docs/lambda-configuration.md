@@ -41,7 +41,7 @@ type: hook
 path | type | required | default/example | description
 --- | --- | --- | --- | ---
 .config | string | false | `lambuild.yaml` | relative path from repository's root directory to the buildspec template file on the source repository
-.if | string (expr's expression) | false | | if an event doesn't match the condition, the event is ignored. If this field is empty, no event is ignored
+.if | string (expression) | false | | the evaluated result must be a boolean. if an event doesn't match the condition, the event is ignored. If this field is empty, no event is ignored
 
 ## Optional Environment Variables
 

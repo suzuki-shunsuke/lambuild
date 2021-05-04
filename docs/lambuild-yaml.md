@@ -91,22 +91,24 @@ batch:
 
 path | type | example | description
 --- | --- | --- | ---
-.lambuild.env.variables | `map[string]string`. The value of map is expr's expression | | build's environment variables. The environment variables of `.lambuild.env.variables` are passed by the override option
-.batch.build-list[].if | string (expr's expression) | |
-.batch.build-graph[].if | string (expr's expression) | |
+.lambuild.env.variables | `map[string](string expression)` | | build's environment variables. The environment variables of `.lambuild.env.variables` are passed by the override option
+.batch.build-list[].if | string expression | |
+.batch.build-graph[].if | string expression | |
 .batch.build-matrix.dynamic.buildspec | ExprList | |
 .batch.build-matrix.dynamic.env.compute-type | ExprList | |
 .batch.build-matrix.dynamic.env.image | ExprList | |
 .batch.build-matrix.dynamic.env.variables | `map[string]ExprList` | |
 
-`type: ExprList` is a list whose element is either `string` or `ExprElem`.
+* `type: bool expression` is a string whose evaluated result is a boolean
+* `type: string expression` is a string whose evaluated result is a string
+* `type: ExprList` is a list whose element is either `string` or `ExprElem`
 
 type: ExprElem
 
 path | type | example | description
 --- | --- | --- | ---
 .value | string | |
-.if | string (expr's expression) | |
+.if | bool expression | |
 
 ## Specification to generate buildspec
 
