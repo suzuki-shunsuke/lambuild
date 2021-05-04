@@ -2,7 +2,7 @@
 
 _Lambda => CodeBuild = lambuild_
 
-Trigger AWS Lambda Funciton via GitHub Webhook to generate AWS CodeBuild's buildspec dynamically and start build
+Trigger AWS CodeBuilds build with dynamic configuration based on the content of event and associated pull request with GitHub Webhook and Lambda Function.
 
 ## Link
 
@@ -16,8 +16,10 @@ Trigger AWS Lambda Funciton via GitHub Webhook to generate AWS CodeBuild's build
 
 ## Motivation
 
-To change CodeBuild's build configuraiton dynamically by the content of event and associated pull request.
-For example, running the build `test_foo` only when the service `foo` is updated in the associated pull request.
+When we use CodeBuild's Batch Build, we want to change the build configuration base on the content of event and associated pull request.
+This is especially important for _Monorepo_.
+For example, we want to run the build `test_foo` only when the service `foo` is updated in the associated pull request.
+But CodeBuild doesn't support such a feature, so we develop `lambuild`.
 
 ## Architecture
 
