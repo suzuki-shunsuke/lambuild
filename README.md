@@ -11,6 +11,7 @@ Trigger AWS CodeBuilds build with dynamic configuration based on the content of 
   * [Lambda Function's Configuration](docs/lambda-configuration.md)
   * [lambuild.yaml](docs/lambuild-yaml.md)
   * [Secrets](docs/secret.md)
+  * [Lambda Execution Role](docs/iam.md)
 * [Expression](docs/expression.md)
 * [Error Notification](docs/error-notification.md)
 

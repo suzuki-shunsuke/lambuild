@@ -7,22 +7,23 @@
 
 ## Prepare
 
-* Create a repository for getting started
-* Create a CodeBuild Project
+* Create a GitHub repository for getting started
+* [Create a CodeBuild Project](https://docs.aws.amazon.com/codebuild/latest/userguide/create-project.html)
   * source: GitHub Repository
   * Enable Batch Build
   * Don't configure Webhook
-* Create Lambda Function
-* Create API Gateway
+* [Create Lambda Function](https://docs.aws.amazon.com/lambda/latest/dg/getting-started-create-function.html)
+* [Create API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/getting-started.html)
   * type: HTTP
-* Generate Webhook Secret to validate Webhook
-* Generate GitHub Personal Access Token
-* Create AWS Systems Manager Parameter Store's parameteres
-* Configure Lambda Function's Execution Role
-* Deploy Lambda Function
-* Configure GitHub Repository's webhook
+* [Generate Webhook Secret to validate Webhook](https://docs.github.com/en/developers/webhooks-and-events/securing-your-webhooks)
+* [Generate GitHub Personal Access Token](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token)
+* [Create AWS Systems Manager Parameter Store's parameteres](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html)
+  * Please see [secret](secret.md) too
+* [Configure Lambda Function's Execution Role](iam.md)
+* [Deploy Lambda Function](#deploy-lambda-function)
+* [Configure GitHub Repository's webhook](https://docs.github.com/en/developers/webhooks-and-events/creating-webhooks)
 * Commit files and push to repository and open a pull request
-* Confirm build is started expectedly
+* Confirm build is run expectedly
 
 ## Sample Configuration
 
@@ -67,3 +68,7 @@ batch:
       buildspec: buildspec/renovate.yaml
       if: 'any(getPRFileNames(), {# == "renovate.json"})'
 ```
+
+## Deploy Lambda Function
+
+Download the binary from [GitHub Releases](https://github.com/suzuki-shunsuke/lambuild/releases) and deploy it to the Lambda Function.
