@@ -17,7 +17,6 @@ The following parameters are passed to expressions.
 .getPRFiles | `func() []*github.CommitFile` | | get associated pull request files
 .getPRFileNames | `func() []string` | | get associated pull request file paths
 .getPRLabelNames | `func() []string` | | get associated pull request label names
-.regexp.match | `func(pattern, s string) bool` | | returns true if `s` matches the regular expression `pattern`. Go's [regexp#MatchString](https://golang.org/pkg/regexp/#MatchString) is used
 
 Please see [go-github's document](https://pkg.go.dev/github.com/google/go-github/v35/github) too.
 

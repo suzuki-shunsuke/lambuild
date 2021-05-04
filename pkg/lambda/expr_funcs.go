@@ -2,7 +2,6 @@ package lambda
 
 import (
 	"context"
-	"regexp"
 
 	"github.com/google/go-github/v35/github"
 )
@@ -17,15 +16,6 @@ import (
 // > For example, if your function going to divide by zero 1/0 Expr will also work correctly as it will panic.
 
 func setExprFuncs(env map[string]interface{}) map[string]interface{} {
-	env["regexp"] = map[string]interface{}{
-		"match": func(pattern, s string) bool {
-			f, err := regexp.MatchString(pattern, s)
-			if err != nil {
-				panic(err)
-			}
-			return f
-		},
-	}
 	return env
 }
 
