@@ -74,7 +74,7 @@ func (handler *Handler) setBatchBuildInput(input *codebuild.StartBuildBatchInput
 	return nil
 }
 
-func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data *Data, elem bspec.ListElement) error {
+func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data *Data, elem bspec.ListElement) error { //nolint:dupl
 	if elem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}

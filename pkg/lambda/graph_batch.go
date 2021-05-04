@@ -86,7 +86,7 @@ func (handler *Handler) extractGraph(logE *logrus.Entry, data *Data, allElems []
 	return elems, nil
 }
 
-func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, data *Data, elem bspec.GraphElement) error {
+func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, data *Data, elem bspec.GraphElement) error { //nolint:dupl
 	if elem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}
