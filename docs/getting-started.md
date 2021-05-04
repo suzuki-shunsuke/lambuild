@@ -7,7 +7,7 @@
 
 ## Procedure
 
-* Create a GitHub repository for getting started
+* Create a GitHub repository for this getting started
 * [Create a CodeBuild Project](https://docs.aws.amazon.com/codebuild/latest/userguide/create-project.html)
   * source: GitHub Repository
   * Enable Batch Build
@@ -17,11 +17,13 @@
   * type: HTTP
 * [Generate Webhook Secret to validate Webhook](https://docs.github.com/en/developers/webhooks-and-events/securing-your-webhooks)
 * [Generate GitHub Personal Access Token](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token)
+  * Select scope `repo`
 * [Create AWS Systems Manager Parameter Store's parameteres](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html)
   * Please see [secret](secret.md) too
 * [Configure Lambda Function's Execution Role](iam.md)
 * [Deploy Lambda Function](#deploy-lambda-function)
 * [Configure GitHub Repository's webhook](https://docs.github.com/en/developers/webhooks-and-events/creating-webhooks)
+  * Check `Pull Requests` and `Pushes` events
 * Commit files and push to repository and open a pull request
 * Confirm build is run expectedly
 

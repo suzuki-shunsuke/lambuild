@@ -119,3 +119,17 @@ then `lambuild` calls CodeBuild `StartBuild` API instead of `StartBuildBatch` AP
 which means `lambuild` starts not Batch Build but Build.
 Batch Build has some overhead, so `lambuild` starts Build instead of Batch Build to decrease the Build time.
 In that case, each build's properties are passed by the override option.
+
+In case of `build-graph`, there are dependencies between builds.
+After filtering builds by `if` condition, if some builds which the build `A` depends on are removed then the build `A` also is removed.
+
+For example, in case of the following configuration the build `deploy` isn't run because `deploy` depends on `build` and `build` isn't run.
+
+```yaml
+  build-graph:
+    - identifier: build
+      if: "false"
+    - identifier: deploy
+      depend-on:
+        - build
+```
