@@ -25,6 +25,10 @@ For example, running the build `test_foo` only when the service `foo` is updated
 User = (push, pull_request) => GitHub = (webhook) => API Gateway => Lambda => CodeBuild
 ```
 
+![lambuild-architecture](https://user-images.githubusercontent.com/13323303/116976740-80f1d300-acfc-11eb-96f5-7fb49f0e7e25.png)
+
+_This image is created with [diagrams.net](https://www.diagrams.net/)_
+
 ## How to work
 
 1. Lambda Functions is called via GitHub Webhook
