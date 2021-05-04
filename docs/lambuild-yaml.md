@@ -91,7 +91,7 @@ batch:
 
 path | type | example | description
 --- | --- | --- | ---
-.lambuild.env.variables | `map[string]string`. The value of map is expr's expression | | build's environment variables. The environment variables of `.lambuild.env.variables` are passed by `EnvironmentTypeOverride` option
+.lambuild.env.variables | `map[string]string`. The value of map is expr's expression | | build's environment variables. The environment variables of `.lambuild.env.variables` are passed by the override option
 .batch.build-list[].if | string (expr's expression) | |
 .batch.build-graph[].if | string (expr's expression) | |
 .batch.build-matrix.dynamic.buildspec | ExprList | |
@@ -116,4 +116,4 @@ After filtering builds by `if` condition, if the number of remaining builds is o
 then `lambuild` calls CodeBuild `StartBuild` API instead of `StartBuildBatch` API,
 which means `lambuild` starts not Batch Build but Build.
 Batch Build has some overhead, so `lambuild` starts Build instead of Batch Build to decrease the Build time.
-In that case, each build's properties are passed by override option.
+In that case, each build's properties are passed by the override option.
