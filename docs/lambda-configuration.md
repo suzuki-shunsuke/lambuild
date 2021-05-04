@@ -1,10 +1,14 @@
 # Lambda Function's Configuration
 
+`lambuild` supports the following configuration source.
+
+* Environment Variable (default)
+* AWS AppConfig integration with Lambda extensions
+
 ## Required Environment Variables
 
 name | example | description
 --- | --- | ---
-CONFIG | | YAML string to filter events and map it to repository configuration and CodeBuild Project
 REGION | `us-east-1` | AWS Region where Systems Manamager's Parameter Store and CodeBuild Project exist
 SSM_PARAMETER_NAME_GITHUB_TOKEN | `lambuild_github_token` | Systems Manager's Parameter Name which GitHub Personal Access Token is registered
 SSM_PARAMETER_NAME_WEBHOOK_SECRET | `lambuild_webhook_secret` | Systems Manager's Parameter Name which GitHub Webhook secret is registered

@@ -307,13 +307,24 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 }
 
 func (handler *Handler) Init(ctx context.Context) error {
-	cfg := config.Config{}
-	configRaw := os.Getenv("CONFIG")
-	if configRaw == "" {
-		return errors.New("the environment variable 'CONFIG' is required")
+	cfgSrc := os.Getenv("CONFIG_SOURCE")
+	if cfgSrc == "" {
+		cfgSrc = "env"
 	}
-	if err := yaml.Unmarshal([]byte(configRaw), &cfg); err != nil {
-		return fmt.Errorf("parse the environment variable 'CONFIG' as YAML: %w", err)
+	cfg := config.Config{}
+	switch cfgSrc {
+	case "env":
+		configRaw := os.Getenv("CONFIG")
+		if configRaw == "" {
+			return errors.New("the environment variable 'CONFIG' is required")
+		}
+		if err := yaml.Unmarshal([]byte(configRaw), &cfg); err != nil {
+			return fmt.Errorf("parse the environment variable 'CONFIG' as YAML: %w", err)
+		}
+	case "appconfig-extension":
+		if err := handler.readAppConfig(ctx, &cfg); err != nil {
+			return fmt.Errorf("read application configuration from AppConfig: %w", err)
+		}
 	}
 
 	if len(cfg.Repositories) == 0 {
