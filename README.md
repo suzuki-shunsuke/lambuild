@@ -8,23 +8,21 @@ Trigger AWS Lambda Funciton via GitHub Webhook to generate AWS CodeBuild's build
 
 * [Getting Started](docs/getting-started.md)
 * Configuration
-  * [Lambda Function's Configuration](docs/lambda-configuraion.md)
+  * [Lambda Function's Configuration](docs/lambda-configuration.md)
+  * [lambuild.yaml](docs/lambuild-yaml.md)
   * [Secrets](docs/secret.md)
+* [Expression](docs/expression.md)
+* [Error Notification](docs/error-notification.md)
 
 ## Motivation
 
 To change CodeBuild's build configuraiton dynamically by the content of event and associated pull request.
 For example, running the build `test_foo` only when the service `foo` is updated in the associated pull request.
 
-## Supported GitHub Event
-
-* push
-* pull_request
-
-## Archtecture
+## Architecture
 
 ```
-GitHub Webhook => API Gateway => Lambda => CodeBuild
+User = (push, pull_request) => GitHub = (webhook) => API Gateway => Lambda => CodeBuild
 ```
 
 ## How to work
@@ -34,6 +32,11 @@ GitHub Webhook => API Gateway => Lambda => CodeBuild
 1. Configuration file is downloaded from the source repository
 1. buildspec is generated
 1. Build or Batch Build is run
+
+## Supported GitHub Event
+
+* [push](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#push)
+* [pull_request](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#pull_request)
 
 ## LICENSE
 
