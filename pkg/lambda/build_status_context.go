@@ -26,13 +26,11 @@ func getBuildStatusContext(tpl *template.Template, data *Data) (string, error) {
 	}
 	buf := &bytes.Buffer{}
 	if err := tpl.Execute(buf, map[string]interface{}{
-		"event":         data.Event,
-		"pr":            data.PullRequest,
-		"repo":          data.Repository,
-		"sha":           data.SHA,
-		"ref":           data.Ref,
-		"commit":        data.GetCommit,
-		"commitMessage": data.CommitMessage,
+		"event": data.Event,
+		"pr":    data.PullRequest,
+		"repo":  data.Repository,
+		"sha":   data.SHA,
+		"ref":   data.Ref,
 	}); err != nil {
 		return "", fmt.Errorf("render a build status context: %w", err)
 	}
