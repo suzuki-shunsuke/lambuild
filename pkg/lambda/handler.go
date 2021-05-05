@@ -301,13 +301,9 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 }
 
 func (handler *Handler) Init(ctx context.Context) error {
-	cfgSrc := os.Getenv("CONFIG_SOURCE")
-	if cfgSrc == "" {
-		cfgSrc = "env"
-	}
 	cfg := config.Config{}
-	switch cfgSrc {
-	case "env":
+	switch cfgSrc := os.Getenv("CONFIG_SOURCE"); cfgSrc {
+	case "", "env":
 		configRaw := os.Getenv("CONFIG")
 		if configRaw == "" {
 			return errors.New("the environment variable 'CONFIG' is required")
@@ -319,6 +315,8 @@ func (handler *Handler) Init(ctx context.Context) error {
 		if err := handler.readAppConfig(ctx, &cfg); err != nil {
 			return fmt.Errorf("read application configuration from AppConfig: %w", err)
 		}
+	default:
+		return errors.New("CONFIG_SOURCE is invalid: " + cfgSrc)
 	}
 
 	if len(cfg.Repositories) == 0 {

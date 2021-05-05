@@ -13,9 +13,9 @@ import (
 type Config struct {
 	Region                    string
 	Repositories              []Repository
-	LogLevel                  logrus.Level       `yaml:"log-level"`
-	BuildStatusContext        *template.Template `yaml:"build-status-context"`
-	ErrorNotificationTemplate *template.Template `yaml:"error-notification-template"`
+	LogLevel                  logrus.Level       `yaml:"-"`
+	BuildStatusContext        *template.Template `yaml:"-"`
+	ErrorNotificationTemplate *template.Template `yaml:"-"`
 	SSMParameter              SSMParameter       `yaml:"ssm-parameter"`
 }
 
