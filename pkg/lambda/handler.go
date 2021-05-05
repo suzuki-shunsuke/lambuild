@@ -304,39 +304,73 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 	logE.Info("send a comment to the pull request")
 }
 
-func (handler *Handler) Init(ctx context.Context) error {
-	cfg := config.Config{}
+func (handler *Handler) readConfigFromSource(ctx context.Context, cfg *config.Config) error {
 	switch cfgSrc := os.Getenv("CONFIG_SOURCE"); cfgSrc {
 	case "", "env":
 		configRaw := os.Getenv("CONFIG")
 		if configRaw == "" {
 			return errors.New("the environment variable 'CONFIG' is required")
 		}
-		if err := yaml.Unmarshal([]byte(configRaw), &cfg); err != nil {
+		if err := yaml.Unmarshal([]byte(configRaw), cfg); err != nil {
 			return fmt.Errorf("parse the environment variable 'CONFIG' as YAML: %w", err)
 		}
 	case "appconfig-extension":
-		if err := handler.readAppConfig(ctx, &cfg); err != nil {
+		if err := handler.readAppConfig(ctx, cfg); err != nil {
 			return fmt.Errorf("read application configuration from AppConfig: %w", err)
 		}
 	default:
 		return errors.New("CONFIG_SOURCE is invalid: " + cfgSrc)
 	}
+	return nil
+}
 
-	if cfg.LogLevel != 0 {
-		logrus.SetLevel(cfg.LogLevel)
-	}
-
-	if len(cfg.Repositories) == 0 {
+func (handler *Handler) validateRepositories(repos []config.Repository) error {
+	if len(repos) == 0 {
 		return errors.New(`the configuration 'repositories' is required`)
 	}
-	for _, repo := range cfg.Repositories {
+	for _, repo := range repos {
 		if repo.Name == "" {
 			return errors.New(`the repository 'name' is required`)
 		}
 		if repo.CodeBuild.ProjectName == "" {
 			return fmt.Errorf(`'project-name' is required (repo: %s)`, repo.Name)
 		}
+	}
+	return nil
+}
+
+func (handler *Handler) setErrorNotificationTemplate(cfg *config.Config) error {
+	if cfg.ErrorNotificationTemplate != nil {
+		return nil
+	}
+	if errTpl := os.Getenv("ERROR_NOTIFICATION_TEMPLATE"); errTpl != "" {
+		tpl, err := templ.Compile(errTpl)
+		if err != nil {
+			return fmt.Errorf("parse ERROR_NOTIFICATION_TEMPLATE as template: %w", err)
+		}
+		cfg.ErrorNotificationTemplate = tpl
+		return nil
+	}
+	tpl, err := templ.Compile(defaultErrorNotificationTemplate)
+	if err != nil {
+		return fmt.Errorf("parse defaultErroNotificationTemplate as template: %w", err)
+	}
+	cfg.ErrorNotificationTemplate = tpl
+	return nil
+}
+
+func (handler *Handler) Init(ctx context.Context) error {
+	cfg := config.Config{}
+	if err := handler.readConfigFromSource(ctx, &cfg); err != nil {
+		return fmt.Errorf("read configuration from source: %w", err)
+	}
+
+	if cfg.LogLevel != 0 {
+		logrus.SetLevel(cfg.LogLevel)
+	}
+
+	if err := handler.validateRepositories(cfg.Repositories); err != nil {
+		return fmt.Errorf("validate repositories: %w", err)
 	}
 
 	if cfg.Region == "" {
@@ -370,20 +404,8 @@ func (handler *Handler) Init(ctx context.Context) error {
 		}
 	}
 
-	if cfg.ErrorNotificationTemplate == nil {
-		if errTpl := os.Getenv("ERROR_NOTIFICATION_TEMPLATE"); errTpl != "" {
-			tpl, err := templ.Compile(errTpl)
-			if err != nil {
-				return fmt.Errorf("parse ERROR_NOTIFICATION_TEMPLATE as template: %w", err)
-			}
-			cfg.ErrorNotificationTemplate = tpl
-		} else {
-			tpl, err := templ.Compile(defaultErrorNotificationTemplate)
-			if err != nil {
-				return fmt.Errorf("parse defaultErroNotificationTemplate as template: %w", err)
-			}
-			cfg.ErrorNotificationTemplate = tpl
-		}
+	if err := handler.setErrorNotificationTemplate(&cfg); err != nil {
+		return fmt.Errorf("configure error notification template: %w", err)
 	}
 
 	handler.Config = cfg
