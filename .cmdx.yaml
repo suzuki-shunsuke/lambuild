@@ -36,3 +36,7 @@ tasks:
   description: lint the go code
   usage: lint the go code
   script: golangci-lint run
+- name: build
+  description: create a zip file
+  usage: create a zip file
+  script: goreleaser release --snapshot --rm-dist
