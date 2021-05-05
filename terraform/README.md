@@ -6,10 +6,16 @@ _Note that this Terraform Configuration is for not production use but getting st
 
 ## Requirement
 
+* Git
 * Terraform
 * AWS Access Key
 
 ## Procedure
+
+```console
+$ git clone https://github.com/suzuki-shunsuke/lambuild
+$ cd lambuild/terraform
+```
 
 If you use [tfenv](https://github.com/tfutils/tfenv),
 

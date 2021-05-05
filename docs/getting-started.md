@@ -18,12 +18,13 @@
     * source: GitHub Repository
     * Enable Batch Build
     * Don't configure Webhook
+    * [To checkout the source repository in build, configure your personal access token](https://docs.aws.amazon.com/codebuild/latest/userguide/access-tokens.html)
   * [Create Lambda Function](https://docs.aws.amazon.com/lambda/latest/dg/getting-started-create-function.html)
   * [Create API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/getting-started.html)
     * type: HTTP
   * [Create AWS Systems Manager Parameter Store's parameteres](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html)
     * Please see [secret](secret.md) too
-  * [Configure Lambda Function's Execution Role](iam.md)
+  * [Configure Lambda Function's Execution Role](/terraform/lambda.tf)
   * [Deploy Lambda Function](#deploy-lambda-function)
 * [Configure GitHub Repository's webhook](https://docs.github.com/en/developers/webhooks-and-events/creating-webhooks)
   * Payload URL: AWS API Gateway Invoke URL + `/lambuild`
@@ -37,7 +38,7 @@
 ## Sample Configuration
 
 * [config.yaml](/terraform/config.yaml.template)
-* [lambuild.yaml](/terraform/lambuild.yaml)
+* [lambuild.yaml](https://github.com/suzuki-shunsuke/example-lambuild/blob/main/lambuild.yaml)
 
 ## Deploy Lambda Function
 
