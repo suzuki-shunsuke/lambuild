@@ -1,14 +1,13 @@
 ---
 archives:
 - name_template: "{{.ProjectName}}_{{.Os}}_{{.Arch}}"
+  format: zip
 builds:
-- binary: lambuild
+- binary: bootstrap
   main: cmd/lambuild/main.go
   env:
   - CGO_ENABLED=0
   goos:
-  - windows
-  - darwin
   - linux
   goarch:
   - amd64
