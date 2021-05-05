@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"text/template"
 
-	"github.com/Masterminds/sprig/v3"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
@@ -17,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
+	templ "github.com/suzuki-shunsuke/lambuild/pkg/template"
 	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v2"
 )
@@ -30,15 +29,10 @@ Please check.
 ` + "```"
 
 type Handler struct {
-	Config                    config.Config
-	Secret                    Secret
-	SecretID                  string
-	SecretVersionID           string
-	Region                    string
-	BuildStatusContext        *template.Template
-	GitHub                    *github.Client
-	CodeBuild                 *codebuild.CodeBuild
-	ErrorNotificationTemplate *template.Template
+	Config    config.Config
+	Secret    Secret
+	GitHub    *github.Client
+	CodeBuild *codebuild.CodeBuild
 }
 
 // Do is the Lambda Function's endpoint.
@@ -277,7 +271,7 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 	// generate a comment
 	buf := &bytes.Buffer{}
 	var cmt string
-	if renderErr := handler.ErrorNotificationTemplate.Execute(buf, map[string]interface{}{
+	if renderErr := handler.Config.ErrorNotificationTemplate.Execute(buf, map[string]interface{}{
 		"Error": e,
 	}); renderErr != nil {
 		logE.WithError(renderErr).Error("render a comment to send it to the pull request")
@@ -339,47 +333,63 @@ func (handler *Handler) Init(ctx context.Context) error {
 		}
 	}
 
-	handler.Config = cfg
-	handler.Region = os.Getenv("REGION")
-	if handler.Region == "" {
-		return errors.New("the environment variable 'REGION' is required")
-	}
-	sess := session.Must(session.NewSession())
-	secretNameGitHubToken := os.Getenv("SSM_PARAMETER_NAME_GITHUB_TOKEN")
-	if secretNameGitHubToken == "" {
-		return errors.New("the environment variable 'SSM_PARAMETER_NAME_GITHUB_TOKEN' is required")
-	}
-	secretNameWebhookSecret := os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET")
-	if secretNameWebhookSecret == "" {
-		return errors.New("the environment variable 'SSM_PARAMETER_NAME_WEBHOOK_SECRET' is required")
-	}
-
-	if cntxt := os.Getenv("BUILD_STATUS_CONTEXT"); cntxt != "" {
-		tpl, err := template.New("_").Funcs(sprig.TxtFuncMap()).Parse(cntxt)
-		if err != nil {
-			return fmt.Errorf("parse BUILD_STATUS_CONTEXT as template (%s): %w", cntxt, err)
+	if cfg.Region == "" {
+		cfg.Region = os.Getenv("REGION")
+		if cfg.Region == "" {
+			return errors.New("the configuration 'region' is required")
 		}
-		handler.BuildStatusContext = tpl
 	}
 
-	if err := handler.readSecretFromSSM(ctx, sess, secretNameGitHubToken, secretNameWebhookSecret); err != nil {
+	if cfg.SSMParameter.ParameterName.GitHubToken == "" {
+		cfg.SSMParameter.ParameterName.GitHubToken = os.Getenv("SSM_PARAMETER_NAME_GITHUB_TOKEN")
+		if cfg.SSMParameter.ParameterName.GitHubToken == "" {
+			return errors.New("the configuration 'SSM_PARAMETER_NAME_GITHUB_TOKEN' is required")
+		}
+	}
+
+	if cfg.SSMParameter.ParameterName.WebhookSecret == "" {
+		cfg.SSMParameter.ParameterName.WebhookSecret = os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET")
+		if cfg.SSMParameter.ParameterName.WebhookSecret == "" {
+			return errors.New("the configuration 'SSM_PARAMETER_NAME_WEBHOOK_SECRET' is required")
+		}
+	}
+
+	if cfg.BuildStatusContext == nil {
+		if cntxt := os.Getenv("BUILD_STATUS_CONTEXT"); cntxt != "" {
+			tpl, err := templ.Compile(cntxt)
+			if err != nil {
+				return fmt.Errorf("parse BUILD_STATUS_CONTEXT as template (%s): %w", cntxt, err)
+			}
+			cfg.BuildStatusContext = tpl
+		}
+	}
+
+	if cfg.ErrorNotificationTemplate == nil {
+		if errTpl := os.Getenv("ERROR_NOTIFICATION_TEMPLATE"); errTpl != "" {
+			tpl, err := templ.Compile(errTpl)
+			if err != nil {
+				return fmt.Errorf("parse ERROR_NOTIFICATION_TEMPLATE as template: %w", err)
+			}
+			cfg.ErrorNotificationTemplate = tpl
+		} else {
+			tpl, err := templ.Compile(defaultErrorNotificationTemplate)
+			if err != nil {
+				return fmt.Errorf("parse defaultErroNotificationTemplate as template: %w", err)
+			}
+			cfg.ErrorNotificationTemplate = tpl
+		}
+	}
+
+	handler.Config = cfg
+
+	sess := session.Must(session.NewSession())
+	if err := handler.readSecretFromSSM(ctx, sess); err != nil {
 		return err
 	}
-
-	errTpl := os.Getenv("ERROR_NOTIFICATION_TEMPLATE")
-	if errTpl == "" {
-		errTpl = defaultErrorNotificationTemplate
-	}
-
-	tpl, err := template.New("_").Parse(errTpl)
-	if err != nil {
-		return fmt.Errorf("parse an error notification template: %w", err)
-	}
-	handler.ErrorNotificationTemplate = tpl
 
 	handler.GitHub = github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: handler.Secret.GitHubToken},
 	)))
-	handler.CodeBuild = codebuild.New(sess, aws.NewConfig().WithRegion(handler.Region))
+	handler.CodeBuild = codebuild.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
 	return nil
 }

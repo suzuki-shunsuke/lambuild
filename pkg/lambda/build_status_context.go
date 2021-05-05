@@ -10,7 +10,7 @@ import (
 )
 
 func (handler *Handler) setBuildStatusContext(data *Data, input *codebuild.StartBuildInput) error {
-	s, err := getBuildStatusContext(handler.BuildStatusContext, data)
+	s, err := getBuildStatusContext(handler.Config.BuildStatusContext, data)
 	if err != nil || s == "" {
 		return err
 	}

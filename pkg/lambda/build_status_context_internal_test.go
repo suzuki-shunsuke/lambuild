@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
+	templ "github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
 func Test_getBuildStatusContext(t *testing.T) {
@@ -35,7 +36,7 @@ func Test_getBuildStatusContext(t *testing.T) {
 			t.Parallel()
 			var tpl *template.Template
 			if d.tpl != "" {
-				tp, err := template.New("_").Parse(d.tpl)
+				tp, err := templ.Compile(d.tpl)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -83,11 +84,11 @@ func TestHandler_setBuildStatusContext(t *testing.T) {
 			t.Parallel()
 			handler := Handler{}
 			if d.tpl != "" {
-				tpl, err := template.New("_").Parse(d.tpl)
+				tpl, err := templ.Compile(d.tpl)
 				if err != nil {
 					t.Fatal(err)
 				}
-				handler.BuildStatusContext = tpl
+				handler.Config.BuildStatusContext = tpl
 			}
 
 			if err := handler.setBuildStatusContext(&d.data, &d.input); err != nil {

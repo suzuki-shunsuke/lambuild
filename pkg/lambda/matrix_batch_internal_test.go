@@ -31,7 +31,7 @@ func Test_handler_handleMatrix(t *testing.T) {
 			event.Headers.Event == "push" ||
 			any(getPRLabelNames(), {# in ["api"]}) ||
 			any(getPRFileNames(), {# startsWith "api/"}) ||
-			any(getPRFileNames(), {regexp.match("^modules/", #)})`,
+			any(getPRFileNames(), {# matches "^modules/"})`,
 			exp: true,
 		},
 	}
