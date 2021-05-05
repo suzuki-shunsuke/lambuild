@@ -1,6 +1,11 @@
-/config.yaml
+config.yaml
 /function.json
 /release.sh
-/terraform
+terraform.tfstate
+terraform.tfstate*
+terraform.tfvars
+.terraform
 /src
 /dist
+*.zip
+.terraform.lock.hcl
