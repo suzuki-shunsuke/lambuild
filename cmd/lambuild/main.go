@@ -12,6 +12,7 @@ import (
 
 func main() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrus.Info("start program")
 	if err := core(); err != nil {
 		logrus.Fatal(err)
 	}
@@ -37,6 +38,7 @@ func core() error {
 	if err := handler.Init(ctx); err != nil {
 		return fmt.Errorf("initialize the Lambda Function: %w", err)
 	}
+	logrus.Debug("start handler")
 	lambda.Start(handler.Do)
 	return nil
 }
