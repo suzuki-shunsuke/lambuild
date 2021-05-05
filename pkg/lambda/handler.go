@@ -200,6 +200,7 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 	if err != nil {
 		return err
 	}
+	logE.Debug("get a configuration file from the source repository")
 
 	buildInput := &BuildInput{
 		Build: &codebuild.StartBuildInput{
@@ -213,18 +214,21 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 	}
 
 	if len(buildspec.Batch.BuildGraph) != 0 {
+		logE.Debug("handling build-graph")
 		if err := handler.handleGraph(buildInput, logE, data, buildspec); err != nil {
 			return err
 		}
 	}
 
 	if len(buildspec.Batch.BuildList) != 0 {
+		logE.Debug("handling build-list")
 		if err := handler.handleList(buildInput, logE, data, buildspec); err != nil {
 			return err
 		}
 	}
 
 	if !buildspec.Batch.BuildMatrix.Empty() {
+		logE.Debug("handling build-matrix")
 		if err := handler.handleMatrix(buildInput, logE, data, buildspec); err != nil {
 			return err
 		}
@@ -317,6 +321,10 @@ func (handler *Handler) Init(ctx context.Context) error {
 		}
 	default:
 		return errors.New("CONFIG_SOURCE is invalid: " + cfgSrc)
+	}
+
+	if cfg.LogLevel != 0 {
+		logrus.SetLevel(cfg.LogLevel)
 	}
 
 	if len(cfg.Repositories) == 0 {
