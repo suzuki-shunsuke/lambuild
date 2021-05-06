@@ -142,16 +142,17 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 	if err != nil {
 		logE.WithFields(logrus.Fields{
 			"path": hook.Config,
-		}).WithError(err).Error("get the configuration file")
-		return buildspec, nil
-	}
-	if file == nil {
-		logE.Warn("downloaded file is nil")
-		return buildspec, nil
+		}).WithError(err).Error("")
+		return buildspec, fmt.Errorf("get a configuration file by GitHub API: %w", err)
 	}
 	content, err := file.GetContent()
 	if err != nil {
 		return buildspec, fmt.Errorf("get a content: %w", err)
+	}
+
+	m := map[string]interface{}{}
+	if err := yaml.Unmarshal([]byte(content), &m); err != nil {
+		return buildspec, fmt.Errorf("unmarshal a buildspec to map: %w", err)
 	}
 
 	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
@@ -159,6 +160,7 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 	}
 	data.Lambuild = buildspec.Lambuild
 	buildspec.Lambuild = bspec.Lambuild{}
+	buildspec.Map = m
 	return buildspec, nil
 }
 

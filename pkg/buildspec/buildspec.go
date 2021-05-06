@@ -8,11 +8,21 @@ import (
 )
 
 type Buildspec struct {
-	Version  float64  `yaml:"version"`
-	Env      Env      `yaml:",omitempty"`
-	Phases   Phases   `yaml:",omitempty"`
-	Batch    Batch    `yaml:",omitempty"`
-	Lambuild Lambuild `yaml:",omitempty"`
+	Batch    Batch                  `yaml:",omitempty"`
+	Lambuild Lambuild               `yaml:",omitempty"`
+	Map      map[string]interface{} `yaml:"-"`
+}
+
+func (buildspec *Buildspec) MarshalYAML() (interface{}, error) {
+	m := make(map[string]interface{}, len(buildspec.Map))
+	for k, v := range buildspec.Map {
+		if k == "lambuild" {
+			continue
+		}
+		m[k] = v
+	}
+	m["batch"] = buildspec.Batch
+	return m, nil
 }
 
 type Lambuild struct {

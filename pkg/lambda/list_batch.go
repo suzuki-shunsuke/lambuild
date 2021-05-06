@@ -65,7 +65,7 @@ func (handler *Handler) setBatchBuildInput(input *codebuild.StartBuildBatchInput
 	}
 	input.EnvironmentVariablesOverride = envs
 
-	builtContent, err := yaml.Marshal(buildspec)
+	builtContent, err := yaml.Marshal(&buildspec)
 	if err != nil {
 		return fmt.Errorf("marshal a buildspec: %w", err)
 	}
