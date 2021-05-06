@@ -9,3 +9,4 @@ terraform.tfvars
 /dist
 *.zip
 .terraform.lock.hcl
+.coverage
