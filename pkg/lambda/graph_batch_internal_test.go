@@ -1,4 +1,4 @@
-package lambda //nolint:dupl
+package lambda
 
 import (
 	"reflect"
