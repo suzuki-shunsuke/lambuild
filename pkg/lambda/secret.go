@@ -18,12 +18,12 @@ func (handler *Handler) readSecretFromSSM(ctx context.Context, sess *session.Ses
 	svc := ssm.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
 	var err error
 
-	handler.Secret.GitHubToken, err = handler.getSecret(ctx, svc, handler.Config.SSMParameter.ParameterName.GitHubToken)
+	handler.Secret.GitHubToken, err = getSecret(ctx, svc, handler.Config.SSMParameter.ParameterName.GitHubToken)
 	if err != nil {
 		return fmt.Errorf("get GitHub Access Token: %w", err)
 	}
 
-	handler.Secret.WebhookSecret, err = handler.getSecret(ctx, svc, handler.Config.SSMParameter.ParameterName.WebhookSecret)
+	handler.Secret.WebhookSecret, err = getSecret(ctx, svc, handler.Config.SSMParameter.ParameterName.WebhookSecret)
 	if err != nil {
 		return fmt.Errorf("get a secret webhook: %w", err)
 	}
@@ -31,7 +31,7 @@ func (handler *Handler) readSecretFromSSM(ctx context.Context, sess *session.Ses
 	return nil
 }
 
-func (handler *Handler) getSecret(ctx context.Context, svc *ssm.SSM, key string) (string, error) {
+func getSecret(ctx context.Context, svc *ssm.SSM, key string) (string, error) {
 	out, err := svc.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name:           aws.String(key),
 		WithDecryption: aws.Bool(true),

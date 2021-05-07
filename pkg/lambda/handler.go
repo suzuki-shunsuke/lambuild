@@ -104,7 +104,7 @@ func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
 }
 
 // matchHook returns true if data matches hook's condition.
-func (handler *Handler) matchHook(data *Data, hook config.Hook) (bool, error) {
+func matchHook(data *Data, hook config.Hook) (bool, error) {
 	if hook.If == nil {
 		return true, nil
 	}
@@ -117,9 +117,9 @@ func (handler *Handler) matchHook(data *Data, hook config.Hook) (bool, error) {
 
 // getHook returns a hook configuration which data matches.
 // If data doesn't match any configuration, the second returned value is false.
-func (handler *Handler) getHook(data *Data, repo config.Repository) (config.Hook, bool, error) {
+func getHook(data *Data, repo config.Repository) (config.Hook, bool, error) {
 	for _, hook := range repo.Hooks {
-		f, err := handler.matchHook(data, hook)
+		f, err := matchHook(data, hook)
 		if err != nil {
 			return config.Hook{}, false, err
 		}
@@ -185,7 +185,7 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 		return nil
 	}
 
-	hook, f, err := handler.getHook(data, repo)
+	hook, f, err := getHook(data, repo)
 	if err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func (handler *Handler) readConfigFromSource(ctx context.Context, cfg *config.Co
 	return nil
 }
 
-func (handler *Handler) validateRepositories(repos []config.Repository) error {
+func validateRepositories(repos []config.Repository) error {
 	if len(repos) == 0 {
 		return errors.New(`the configuration 'repositories' is required`)
 	}
@@ -341,7 +341,7 @@ func (handler *Handler) validateRepositories(repos []config.Repository) error {
 	return nil
 }
 
-func (handler *Handler) setErrorNotificationTemplate(cfg *config.Config) error {
+func setErrorNotificationTemplate(cfg *config.Config) error {
 	if cfg.ErrorNotificationTemplate != nil {
 		return nil
 	}
@@ -371,7 +371,7 @@ func (handler *Handler) Init(ctx context.Context) error {
 		logrus.SetLevel(cfg.LogLevel)
 	}
 
-	if err := handler.validateRepositories(cfg.Repositories); err != nil {
+	if err := validateRepositories(cfg.Repositories); err != nil {
 		return fmt.Errorf("validate repositories: %w", err)
 	}
 
@@ -406,7 +406,7 @@ func (handler *Handler) Init(ctx context.Context) error {
 		}
 	}
 
-	if err := handler.setErrorNotificationTemplate(&cfg); err != nil {
+	if err := setErrorNotificationTemplate(&cfg); err != nil {
 		return fmt.Errorf("configure error notification template: %w", err)
 	}
 

@@ -13,7 +13,7 @@ import (
 func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error { //nolint:gocognit
 	dynamic := buildspec.Batch.BuildMatrix.Dynamic
 	if len(dynamic.Buildspec) != 0 {
-		buildspecs, err := handler.filterExprList(data, dynamic.Buildspec)
+		buildspecs, err := filterExprList(data, dynamic.Buildspec)
 		if err != nil {
 			return fmt.Errorf("filter buildspecs: %w", err)
 		}
@@ -26,7 +26,7 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	}
 
 	if len(dynamic.Env.Image) != 0 {
-		images, err := handler.filterExprList(data, dynamic.Env.Image)
+		images, err := filterExprList(data, dynamic.Env.Image)
 		if err != nil {
 			return fmt.Errorf("filter images: %w", err)
 		}
@@ -39,7 +39,7 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	}
 
 	if len(dynamic.Env.ComputeType) != 0 {
-		computeTypes, err := handler.filterExprList(data, dynamic.Env.ComputeType)
+		computeTypes, err := filterExprList(data, dynamic.Env.ComputeType)
 		if err != nil {
 			return fmt.Errorf("filter compute-type: %w", err)
 		}
@@ -54,7 +54,7 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	if len(dynamic.Env.Variables) != 0 {
 		envVars := make(map[string]bspec.ExprList, len(dynamic.Env.Variables))
 		for k, v := range dynamic.Env.Variables {
-			vars, err := handler.filterExprList(data, v)
+			vars, err := filterExprList(data, v)
 			if err != nil {
 				return fmt.Errorf("filter env.variables: %w", err)
 			}
@@ -75,7 +75,7 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	if len(dynamic.Buildspec) > 1 || len(dynamic.Env.Image) > 1 || len(dynamic.Env.ComputeType) > 1 || getSizeOfEnvVars(dynamic.Env.Variables) > 1 {
 		// batch build
 		buildInput.Batched = true
-		if err := handler.setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
+		if err := setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
 			return fmt.Errorf("set codebuild.StartBuildBatchInput: %w", err)
 		}
 		return nil
@@ -89,7 +89,7 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	return nil
 }
 
-func (handler *Handler) filterExprList(data *Data, src bspec.ExprList) (bspec.ExprList, error) {
+func filterExprList(data *Data, src bspec.ExprList) (bspec.ExprList, error) {
 	list := bspec.ExprList{}
 	for _, bs := range src {
 		s, ok := bs.(string)

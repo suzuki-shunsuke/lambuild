@@ -11,7 +11,7 @@ import (
 )
 
 func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
-	elems, err := handler.extractGraph(logE, data, buildspec.Batch.BuildGraph)
+	elems, err := extractGraph(logE, data, buildspec.Batch.BuildGraph)
 	if err != nil {
 		return err
 	}
@@ -32,13 +32,13 @@ func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, 
 
 	buildInput.Batched = true
 	buildspec.Batch.BuildGraph = elems
-	if err := handler.setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
+	if err := setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildBatchInput: %w", err)
 	}
 	return nil
 }
 
-func (handler *Handler) extractGraph(logE *logrus.Entry, data *Data, allElems []bspec.GraphElement) ([]bspec.GraphElement, error) {
+func extractGraph(logE *logrus.Entry, data *Data, allElems []bspec.GraphElement) ([]bspec.GraphElement, error) {
 	identifiers := make(map[string]bspec.GraphElement, len(allElems))
 	for _, elem := range allElems {
 		if elem.If == nil {

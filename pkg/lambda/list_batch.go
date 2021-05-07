@@ -12,7 +12,7 @@ import (
 )
 
 func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
-	listElems, err := handler.extractBuildList(data, buildspec.Batch.BuildList)
+	listElems, err := extractBuildList(data, buildspec.Batch.BuildList)
 	if err != nil {
 		return err
 	}
@@ -33,13 +33,13 @@ func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, d
 
 	buildInput.Batched = true
 	buildspec.Batch.BuildList = listElems
-	if err := handler.setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
+	if err := setBatchBuildInput(buildInput.BatchBuild, buildspec, data); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildBatchInput: %w", err)
 	}
 	return nil
 }
 
-func (handler *Handler) getLambuildEnvVars(data *Data) ([]*codebuild.EnvironmentVariable, error) {
+func getLambuildEnvVars(data *Data) ([]*codebuild.EnvironmentVariable, error) {
 	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
 		a, err := runExpr(prog, data)
@@ -58,8 +58,8 @@ func (handler *Handler) getLambuildEnvVars(data *Data) ([]*codebuild.Environment
 	return envs, nil
 }
 
-func (handler *Handler) setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data) error {
-	envs, err := handler.getLambuildEnvVars(data)
+func setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data) error {
+	envs, err := getLambuildEnvVars(data)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data
 	return nil
 }
 
-func (handler *Handler) extractBuildList(data *Data, allElems []bspec.ListElement) ([]bspec.ListElement, error) {
+func extractBuildList(data *Data, allElems []bspec.ListElement) ([]bspec.ListElement, error) {
 	listElems := []bspec.ListElement{}
 	for _, listElem := range allElems {
 		if listElem.If == nil {

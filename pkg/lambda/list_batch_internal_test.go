@@ -76,7 +76,7 @@ func TestHandler_setListBuildInput(t *testing.T) {
 	}
 }
 
-func TestHandler_extractBuildList(t *testing.T) {
+func Test_extractBuildList(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
@@ -101,14 +101,13 @@ func TestHandler_extractBuildList(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			handler := Handler{}
 
 			allElems := []bspec.ListElement{}
 			if err := yaml.Unmarshal([]byte(d.input), &allElems); err != nil {
 				t.Fatal(err)
 			}
 
-			elems, err := handler.extractBuildList(&d.data, allElems)
+			elems, err := extractBuildList(&d.data, allElems)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")
@@ -155,7 +154,6 @@ variables:
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			handler := Handler{}
 
 			env := bspec.LambuildEnv{}
 			if err := yaml.Unmarshal([]byte(d.input), &env); err != nil {
@@ -168,7 +166,7 @@ variables:
 				},
 			}
 
-			envs, err := handler.getLambuildEnvVars(&data)
+			envs, err := getLambuildEnvVars(&data)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")
