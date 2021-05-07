@@ -1,4 +1,4 @@
-package lambda
+package initializer
 
 import (
 	"context"
@@ -12,14 +12,15 @@ import (
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
+	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
 	templ "github.com/suzuki-shunsuke/lambuild/pkg/template"
 	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) Init(ctx context.Context) error {
+func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 	cfg := config.Config{}
-	if err := handler.readConfigFromSource(ctx, &cfg); err != nil {
+	if err := readConfigFromSource(ctx, &cfg); err != nil {
 		return fmt.Errorf("read configuration from source: %w", err)
 	}
 
@@ -69,7 +70,7 @@ func (handler *Handler) Init(ctx context.Context) error {
 	handler.Config = cfg
 
 	sess := session.Must(session.NewSession())
-	if err := handler.readSecretFromSSM(ctx, sess); err != nil {
+	if err := readSecretFromSSM(ctx, handler, sess); err != nil {
 		return err
 	}
 
@@ -95,7 +96,7 @@ func validateRepositories(repos []config.Repository) error {
 	return nil
 }
 
-func (handler *Handler) readConfigFromSource(ctx context.Context, cfg *config.Config) error {
+func readConfigFromSource(ctx context.Context, cfg *config.Config) error {
 	switch cfgSrc := os.Getenv("CONFIG_SOURCE"); cfgSrc {
 	case "", "env":
 		configRaw := os.Getenv("CONFIG")
@@ -106,7 +107,7 @@ func (handler *Handler) readConfigFromSource(ctx context.Context, cfg *config.Co
 			return fmt.Errorf("parse the environment variable 'CONFIG' as YAML: %w", err)
 		}
 	case "appconfig-extension":
-		if err := handler.readAppConfig(ctx, cfg); err != nil {
+		if err := readAppConfig(ctx, cfg); err != nil {
 			return fmt.Errorf("read application configuration from AppConfig: %w", err)
 		}
 	default:

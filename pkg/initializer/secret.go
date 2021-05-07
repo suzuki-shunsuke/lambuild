@@ -1,4 +1,4 @@
-package lambda
+package initializer
 
 import (
 	"context"
@@ -7,14 +7,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
 )
 
-type Secret struct {
-	GitHubToken   string `json:"github_token"`
-	WebhookSecret string `json:"webhook_secret"`
-}
-
-func (handler *Handler) readSecretFromSSM(ctx context.Context, sess *session.Session) error {
+func readSecretFromSSM(ctx context.Context, handler *lambda.Handler, sess *session.Session) error {
 	svc := ssm.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
 	var err error
 

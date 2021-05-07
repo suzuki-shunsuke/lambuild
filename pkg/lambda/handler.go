@@ -22,6 +22,11 @@ type Handler struct {
 	CodeBuild *codebuild.CodeBuild
 }
 
+type Secret struct {
+	GitHubToken   string `json:"github_token"`
+	WebhookSecret string `json:"webhook_secret"`
+}
+
 // Do is the Lambda Function's endpoint.
 func (handler *Handler) Do(ctx context.Context, event Event) error {
 	if err := github.ValidateSignature(event.Headers.Signature, []byte(event.Body), []byte(handler.Secret.WebhookSecret)); err != nil {

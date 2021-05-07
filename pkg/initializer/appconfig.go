@@ -1,4 +1,4 @@
-package lambda
+package initializer
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) readAppConfig(ctx context.Context, cfg *config.Config) error {
+func readAppConfig(ctx context.Context, cfg *config.Config) error {
 	appName := os.Getenv("APPCONFIG_APPLICATION_NAME")
 	if appName == "" {
 		return errors.New(`APPCONFIG_APPLICATION_NAME is required`)

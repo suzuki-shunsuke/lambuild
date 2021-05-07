@@ -7,12 +7,21 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/sirupsen/logrus"
+	"github.com/suzuki-shunsuke/lambuild/pkg/initializer"
 	lmb "github.com/suzuki-shunsuke/lambuild/pkg/lambda"
+)
+
+var (
+	version  = ""
+	revision = "" //nolint:gochecknoglobals
 )
 
 func main() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
-	logrus.Info("start program")
+	logrus.WithFields(logrus.Fields{
+		"version":  version,
+		"revision": revision,
+	}).Info("start program")
 	if err := core(); err != nil {
 		logrus.Fatal(err)
 	}
@@ -35,7 +44,7 @@ func core() error {
 	}
 	ctx := context.Background()
 	handler := lmb.Handler{}
-	if err := handler.Init(ctx); err != nil {
+	if err := initializer.InitializeHandler(ctx, &handler); err != nil {
 		return fmt.Errorf("initialize the Lambda Function: %w", err)
 	}
 	logrus.Debug("start handler")
