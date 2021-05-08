@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
+	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
@@ -70,9 +71,12 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 	handler.Config = cfg
 
 	sess := session.Must(session.NewSession())
-	if err := readSecretFromSSM(ctx, handler, sess); err != nil {
+	ssmSvc := ssm.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
+	secret, err := readSecretFromSSM(ctx, ssmSvc, handler.Config.SSMParameter.ParameterName)
+	if err != nil {
 		return err
 	}
+	handler.Secret = secret
 
 	handler.GitHub = github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: handler.Secret.GitHubToken},

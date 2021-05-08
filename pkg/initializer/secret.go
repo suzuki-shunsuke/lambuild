@@ -5,29 +5,34 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
 )
 
-func readSecretFromSSM(ctx context.Context, handler *lambda.Handler, sess *session.Session) error {
-	svc := ssm.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
-	var err error
-
-	handler.Secret.GitHubToken, err = getSecret(ctx, svc, handler.Config.SSMParameter.ParameterName.GitHubToken)
-	if err != nil {
-		return fmt.Errorf("get GitHub Access Token: %w", err)
-	}
-
-	handler.Secret.WebhookSecret, err = getSecret(ctx, svc, handler.Config.SSMParameter.ParameterName.WebhookSecret)
-	if err != nil {
-		return fmt.Errorf("get a secret webhook: %w", err)
-	}
-
-	return nil
+type SSM interface {
+	GetParameterWithContext(ctx aws.Context, input *ssm.GetParameterInput, opts ...request.Option) (*ssm.GetParameterOutput, error)
 }
 
-func getSecret(ctx context.Context, svc *ssm.SSM, key string) (string, error) {
+func readSecretFromSSM(ctx context.Context, svc SSM, parameterName config.ParameterName) (lambda.Secret, error) {
+	var err error
+	secret := lambda.Secret{}
+
+	secret.GitHubToken, err = getSecret(ctx, svc, parameterName.GitHubToken)
+	if err != nil {
+		return secret, fmt.Errorf("get GitHub Access Token: %w", err)
+	}
+
+	secret.WebhookSecret, err = getSecret(ctx, svc, parameterName.WebhookSecret)
+	if err != nil {
+		return secret, fmt.Errorf("get a secret webhook: %w", err)
+	}
+
+	return secret, nil
+}
+
+func getSecret(ctx context.Context, svc SSM, key string) (string, error) {
 	out, err := svc.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name:           aws.String(key),
 		WithDecryption: aws.Bool(true),
