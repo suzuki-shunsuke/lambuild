@@ -1,4 +1,4 @@
-package lambda
+package generator
 
 import (
 	"reflect"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	templ "github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
@@ -16,7 +17,7 @@ func Test_getBuildStatusContext(t *testing.T) {
 		title string
 		tpl   string
 		exp   string
-		data  Data
+		data  domain.Data
 	}{
 		{
 			title: "minimum",
@@ -25,7 +26,7 @@ func Test_getBuildStatusContext(t *testing.T) {
 			title: "normal",
 			tpl:   "{{.sha}}",
 			exp:   "0000",
-			data: Data{
+			data: domain.Data{
 				SHA: "0000",
 			},
 		},
@@ -53,14 +54,14 @@ func Test_getBuildStatusContext(t *testing.T) {
 	}
 }
 
-func TestHandler_setBuildStatusContext(t *testing.T) {
+func Test_setBuildStatusContext(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
 		tpl   string
 		input codebuild.StartBuildInput
 		exp   codebuild.StartBuildInput
-		data  Data
+		data  domain.Data
 	}{
 		{
 			title: "minimum",
@@ -73,7 +74,7 @@ func TestHandler_setBuildStatusContext(t *testing.T) {
 					Context: aws.String("0000"),
 				},
 			},
-			data: Data{
+			data: domain.Data{
 				SHA: "0000",
 			},
 		},
@@ -82,16 +83,16 @@ func TestHandler_setBuildStatusContext(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			handler := Handler{}
+			var tpl *template.Template
 			if d.tpl != "" {
-				tpl, err := templ.Compile(d.tpl)
+				tl, err := templ.Compile(d.tpl)
 				if err != nil {
 					t.Fatal(err)
 				}
-				handler.Config.BuildStatusContext = tpl
+				tpl = tl
 			}
 
-			if err := handler.setBuildStatusContext(&d.data, &d.input); err != nil {
+			if err := setBuildStatusContext(tpl, &d.data, &d.input); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(d.exp, d.input) {

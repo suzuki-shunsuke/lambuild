@@ -1,16 +1,18 @@
-package lambda
+package generator
 
 import (
 	"errors"
 	"fmt"
+	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
 
-func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
+func handleGraph(buildStatusContext *template.Template, buildInput *domain.BuildInput, logE *logrus.Entry, data *domain.Data, buildspec bspec.Buildspec) error {
 	elems, err := extractGraph(logE, data, buildspec.Batch.BuildGraph)
 	if err != nil {
 		return err
@@ -24,7 +26,7 @@ func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, 
 	if len(elems) == 1 {
 		elem := elems[0]
 		buildInput.Build.BuildspecOverride = aws.String(elem.Buildspec)
-		if err := handler.setGraphBuildInput(buildInput.Build, data, elem); err != nil {
+		if err := setGraphBuildInput(buildInput.Build, buildStatusContext, data, elem); err != nil {
 			return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 		}
 		return nil
@@ -38,14 +40,14 @@ func (handler *Handler) handleGraph(buildInput *BuildInput, logE *logrus.Entry, 
 	return nil
 }
 
-func extractGraph(logE *logrus.Entry, data *Data, allElems []bspec.GraphElement) ([]bspec.GraphElement, error) {
+func extractGraph(logE *logrus.Entry, data *domain.Data, allElems []bspec.GraphElement) ([]bspec.GraphElement, error) {
 	identifiers := make(map[string]bspec.GraphElement, len(allElems))
 	for _, elem := range allElems {
 		if elem.If == nil {
 			identifiers[elem.Identifier] = elem
 			continue
 		}
-		f, err := runExpr(elem.If, data)
+		f, err := domain.RunExpr(elem.If, data)
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
 		}
@@ -86,7 +88,7 @@ func extractGraph(logE *logrus.Entry, data *Data, allElems []bspec.GraphElement)
 	return elems, nil
 }
 
-func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, data *Data, elem bspec.GraphElement) error { //nolint:dupl
+func setGraphBuildInput(input *codebuild.StartBuildInput, buildStatusContext *template.Template, data *domain.Data, elem bspec.GraphElement) error { //nolint:dupl
 	if elem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}
@@ -103,15 +105,15 @@ func (handler *Handler) setGraphBuildInput(input *codebuild.StartBuildInput, dat
 		input.PrivilegedModeOverride = aws.Bool(true)
 	}
 
-	if err := handler.setBuildStatusContext(data, input); err != nil {
+	if err := setBuildStatusContext(buildStatusContext, data, input); err != nil {
 		return err
 	}
 
 	envMap := make(map[string]string, len(elem.Env.Variables)+len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
-		a, err := runExpr(prog, data)
+		a, err := domain.RunExpr(prog, data)
 		if err != nil {
-			return err
+			return fmt.Errorf("evaluate an expression: %w", err)
 		}
 		s, ok := a.(string)
 		if !ok {

@@ -1,16 +1,18 @@
-package lambda
+package generator
 
 import (
 	"errors"
 	"fmt"
+	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
 
-func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error { //nolint:gocognit
+func handleMatrix(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusContext *template.Template, data *domain.Data, buildspec bspec.Buildspec) error { //nolint:gocognit
 	dynamic := buildspec.Batch.BuildMatrix.Dynamic
 	if len(dynamic.Buildspec) != 0 {
 		buildspecs, err := filterExprList(data, dynamic.Buildspec)
@@ -82,14 +84,14 @@ func (handler *Handler) handleMatrix(buildInput *BuildInput, logE *logrus.Entry,
 	}
 
 	// build
-	if err := handler.setMatrixBuildInput(data, dynamic, buildInput.Build); err != nil {
+	if err := setMatrixBuildInput(data, buildStatusContext, dynamic, buildInput.Build); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 	}
 
 	return nil
 }
 
-func filterExprList(data *Data, src bspec.ExprList) (bspec.ExprList, error) {
+func filterExprList(data *domain.Data, src bspec.ExprList) (bspec.ExprList, error) {
 	list := bspec.ExprList{}
 	for _, bs := range src {
 		s, ok := bs.(string)
@@ -102,7 +104,7 @@ func filterExprList(data *Data, src bspec.ExprList) (bspec.ExprList, error) {
 			list = append(list, a.Value)
 			continue
 		}
-		f, err := runExpr(a.If, data)
+		f, err := domain.RunExpr(a.If, data)
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
 		}
@@ -121,8 +123,8 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 	return size
 }
 
-func (handler *Handler) setMatrixBuildInput(data *Data, dynamic bspec.MatrixDynamic, input *codebuild.StartBuildInput) error {
-	if err := handler.setBuildStatusContext(data, input); err != nil {
+func setMatrixBuildInput(data *domain.Data, buildStatusContext *template.Template, dynamic bspec.MatrixDynamic, input *codebuild.StartBuildInput) error {
+	if err := setBuildStatusContext(buildStatusContext, data, input); err != nil {
 		return err
 	}
 
@@ -138,9 +140,9 @@ func (handler *Handler) setMatrixBuildInput(data *Data, dynamic bspec.MatrixDyna
 
 	envMap := make(map[string]string, len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
-		a, err := runExpr(prog, data)
+		a, err := domain.RunExpr(prog, data)
 		if err != nil {
-			return err
+			return fmt.Errorf("evaluate an expression: %w", err)
 		}
 		s, ok := a.(string)
 		if !ok {

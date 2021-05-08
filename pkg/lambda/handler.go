@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
+	generator "github.com/suzuki-shunsuke/lambuild/pkg/build-input-generator"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"gopkg.in/yaml.v2"
 )
 
@@ -28,7 +29,7 @@ type Secret struct {
 }
 
 // Do is the Lambda Function's endpoint.
-func (handler *Handler) Do(ctx context.Context, event Event) error {
+func (handler *Handler) Do(ctx context.Context, event domain.Event) error {
 	if err := github.ValidateSignature(event.Headers.Signature, []byte(event.Body), []byte(handler.Secret.WebhookSecret)); err != nil {
 		// TODO return 400
 		logrus.Debug(err)
@@ -40,7 +41,7 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 	}
 	event.Payload = body
 
-	data := &Data{
+	data := &domain.Data{
 		Event:  event,
 		GitHub: handler.GitHub,
 	}
@@ -55,7 +56,7 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 	case "push":
 		pushEvent := body.(*github.PushEvent) //nolint:forcetypeassert
 		repo := pushEvent.GetRepo()
-		data.Repository = Repository{
+		data.Repository = domain.Repository{
 			FullName: repo.GetFullName(),
 			Name:     repo.GetName(),
 		}
@@ -67,13 +68,12 @@ func (handler *Handler) Do(ctx context.Context, event Event) error {
 
 		repo := prEvent.GetRepo()
 		pr := prEvent.GetPullRequest()
-		data.Repository = Repository{
+		data.Repository = domain.Repository{
 			FullName: repo.GetFullName(),
 			Name:     repo.GetName(),
 		}
 		data.SHA = prEvent.GetAfter()
 		data.Ref = pr.GetHead().GetRef()
-		data.PullRequest.LabelNames = extractLabelNames(pr.Labels)
 		data.PullRequest.PullRequest = pr
 	}
 	data.Repository.Owner = strings.Split(data.Repository.FullName, "/")[0]
@@ -96,11 +96,11 @@ func (handler *Handler) getRepo(repoName string) (config.Repository, bool) {
 }
 
 // matchHook returns true if data matches hook's condition.
-func matchHook(data *Data, hook config.Hook) (bool, error) {
+func matchHook(data *domain.Data, hook config.Hook) (bool, error) {
 	if hook.If == nil {
 		return true, nil
 	}
-	f, err := runExpr(hook.If, data)
+	f, err := domain.RunExpr(hook.If, data)
 	if err != nil {
 		return false, fmt.Errorf("evaluate an expression: %w", err)
 	}
@@ -109,7 +109,7 @@ func matchHook(data *Data, hook config.Hook) (bool, error) {
 
 // getHook returns a hook configuration which data matches.
 // If data doesn't match any configuration, the second returned value is false.
-func getHook(data *Data, repo config.Repository) (config.Hook, bool, error) {
+func getHook(data *domain.Data, repo config.Repository) (config.Hook, bool, error) {
 	for _, hook := range repo.Hooks {
 		f, err := matchHook(data, hook)
 		if err != nil {
@@ -123,7 +123,7 @@ func getHook(data *Data, repo config.Repository) (config.Hook, bool, error) {
 }
 
 // getConfigFromRepo gets the configuration file from the target repository
-func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entry, data *Data, hook config.Hook) (bspec.Buildspec, error) {
+func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entry, data *domain.Data, hook config.Hook) (bspec.Buildspec, error) {
 	buildspec := bspec.Buildspec{}
 	// get the configuration file from the target repository
 	if hook.Config == "" {
@@ -156,14 +156,7 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 	return buildspec, nil
 }
 
-type BuildInput struct {
-	Build      *codebuild.StartBuildInput
-	BatchBuild *codebuild.StartBuildBatchInput
-	Batched    bool
-	Empty      bool
-}
-
-func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
+func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) error {
 	logE := logrus.WithFields(logrus.Fields{
 		"repo_full_name": data.Repository.FullName,
 		"repo_owner":     data.Repository.Owner,
@@ -196,36 +189,9 @@ func (handler *Handler) handleEvent(ctx context.Context, data *Data) error {
 	}
 	logE.Debug("get a configuration file from the source repository")
 
-	buildInput := &BuildInput{
-		Build: &codebuild.StartBuildInput{
-			ProjectName:   aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion: aws.String(data.SHA),
-		},
-		BatchBuild: &codebuild.StartBuildBatchInput{
-			ProjectName:   aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion: aws.String(data.SHA),
-		},
-	}
-
-	if len(buildspec.Batch.BuildGraph) != 0 {
-		logE.Debug("handling build-graph")
-		if err := handler.handleGraph(buildInput, logE, data, buildspec); err != nil {
-			return err
-		}
-	}
-
-	if len(buildspec.Batch.BuildList) != 0 {
-		logE.Debug("handling build-list")
-		if err := handler.handleList(buildInput, logE, data, buildspec); err != nil {
-			return err
-		}
-	}
-
-	if !buildspec.Batch.BuildMatrix.Empty() {
-		logE.Debug("handling build-matrix")
-		if err := handler.handleMatrix(buildInput, logE, data, buildspec); err != nil {
-			return err
-		}
+	buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
+	if err != nil {
+		return fmt.Errorf("generate a build input: %w", err)
 	}
 
 	if buildInput.Empty {

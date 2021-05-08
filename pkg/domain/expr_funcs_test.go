@@ -1,23 +1,23 @@
-package lambda_test
+package domain_test
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/google/go-github/v35/github"
-	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
 
 func TestData_GetCommit(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
-		data  lambda.Data
+		data  domain.Data
 		exp   *github.Commit
 	}{
 		{
 			title: "normal",
-			data: lambda.Data{
+			data: domain.Data{
 				Commit: &github.Commit{
 					Message: github.String("hello"),
 				},
@@ -43,13 +43,13 @@ func TestData_GetPRNumber(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
-		data  lambda.Data
+		data  domain.Data
 		exp   int
 	}{
 		{
 			title: "normal",
-			data: lambda.Data{
-				PullRequest: lambda.PullRequest{
+			data: domain.Data{
+				PullRequest: domain.PullRequest{
 					Number: 5,
 				},
 			},
@@ -72,13 +72,13 @@ func TestData_GetPR(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
-		data  lambda.Data
+		data  domain.Data
 		exp   *github.PullRequest
 	}{
 		{
 			title: "normal",
-			data: lambda.Data{
-				PullRequest: lambda.PullRequest{
+			data: domain.Data{
+				PullRequest: domain.PullRequest{
 					PullRequest: &github.PullRequest{
 						Number: github.Int(5),
 					},
@@ -105,13 +105,13 @@ func TestData_GetPRFiles(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
-		data  lambda.Data
+		data  domain.Data
 		exp   []*github.CommitFile
 	}{
 		{
 			title: "normal",
-			data: lambda.Data{
-				PullRequest: lambda.PullRequest{
+			data: domain.Data{
+				PullRequest: domain.PullRequest{
 					Files: []*github.CommitFile{
 						{
 							Filename: github.String("foo"),

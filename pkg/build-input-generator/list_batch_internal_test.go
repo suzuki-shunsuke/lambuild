@@ -1,4 +1,4 @@
-package lambda
+package generator
 
 import (
 	"reflect"
@@ -7,16 +7,17 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"gopkg.in/yaml.v2"
 )
 
-func TestHandler_setListBuildInput(t *testing.T) {
+func Test_setListBuildInput(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title     string
 		input     codebuild.StartBuildInput
 		buildspec bspec.Buildspec
-		data      Data
+		data      domain.Data
 		elem      bspec.ListElement
 		isErr     bool
 		exp       codebuild.StartBuildInput
@@ -58,8 +59,7 @@ func TestHandler_setListBuildInput(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			handler := Handler{}
-			err := handler.setListBuildInput(&d.input, &d.data, d.elem)
+			err := setListBuildInput(&d.input, nil, &d.data, d.elem)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")
@@ -82,7 +82,7 @@ func Test_extractBuildList(t *testing.T) {
 		title string
 		input string
 		exp   []string
-		data  Data
+		data  domain.Data
 		isErr bool
 	}{
 		{
@@ -128,7 +128,7 @@ func Test_extractBuildList(t *testing.T) {
 	}
 }
 
-func TestHandler_getLambuildEnvVars(t *testing.T) {
+func Test_getLambuildEnvVars(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
@@ -160,7 +160,7 @@ variables:
 				t.Fatal(err)
 			}
 
-			data := Data{
+			data := domain.Data{
 				Lambuild: bspec.Lambuild{
 					Env: env,
 				},

@@ -1,21 +1,21 @@
-package lambda_test
+package domain_test
 
 import (
 	"testing"
 
-	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
 
 func TestData_CommitMessage(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
-		data  lambda.Data
+		data  domain.Data
 		exp   string
 	}{
 		{
 			title: "normal",
-			data: lambda.Data{
+			data: domain.Data{
 				HeadCommitMessage: "hello",
 			},
 			exp: "hello",

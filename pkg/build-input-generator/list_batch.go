@@ -1,17 +1,19 @@
-package lambda
+package generator
 
 import (
 	"errors"
 	"fmt"
+	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"gopkg.in/yaml.v2"
 )
 
-func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, data *Data, buildspec bspec.Buildspec) error {
+func handleList(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusContext *template.Template, data *domain.Data, buildspec bspec.Buildspec) error {
 	listElems, err := extractBuildList(data, buildspec.Batch.BuildList)
 	if err != nil {
 		return err
@@ -25,7 +27,7 @@ func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, d
 	if len(listElems) == 1 {
 		elem := listElems[0]
 		buildInput.Build.BuildspecOverride = aws.String(elem.Buildspec)
-		if err := handler.setListBuildInput(buildInput.Build, data, elem); err != nil {
+		if err := setListBuildInput(buildInput.Build, buildStatusContext, data, elem); err != nil {
 			return fmt.Errorf("set a codebuild.StartBuildInput: %w", err)
 		}
 		return nil
@@ -39,12 +41,12 @@ func (handler *Handler) handleList(buildInput *BuildInput, logE *logrus.Entry, d
 	return nil
 }
 
-func getLambuildEnvVars(data *Data) ([]*codebuild.EnvironmentVariable, error) {
+func getLambuildEnvVars(data *domain.Data) ([]*codebuild.EnvironmentVariable, error) {
 	envs := make([]*codebuild.EnvironmentVariable, 0, len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
-		a, err := runExpr(prog, data)
+		a, err := domain.RunExpr(prog, data)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("evaluate an expression: %w", err)
 		}
 		s, ok := a.(string)
 		if !ok {
@@ -58,7 +60,7 @@ func getLambuildEnvVars(data *Data) ([]*codebuild.EnvironmentVariable, error) {
 	return envs, nil
 }
 
-func setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *Data) error {
+func setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *domain.Data) error {
 	envs, err := getLambuildEnvVars(data)
 	if err != nil {
 		return err
@@ -74,7 +76,7 @@ func setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.B
 	return nil
 }
 
-func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data *Data, elem bspec.ListElement) error { //nolint:dupl
+func setListBuildInput(input *codebuild.StartBuildInput, contx *template.Template, data *domain.Data, elem bspec.ListElement) error { //nolint:dupl
 	if elem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}
@@ -91,15 +93,15 @@ func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data
 		input.PrivilegedModeOverride = aws.Bool(true)
 	}
 
-	if err := handler.setBuildStatusContext(data, input); err != nil {
+	if err := setBuildStatusContext(contx, data, input); err != nil {
 		return err
 	}
 
 	envMap := make(map[string]string, len(elem.Env.Variables)+len(data.Lambuild.Env.Variables))
 	for k, prog := range data.Lambuild.Env.Variables {
-		a, err := runExpr(prog, data)
+		a, err := domain.RunExpr(prog, data)
 		if err != nil {
-			return err
+			return fmt.Errorf("evaluate an expression: %w", err)
 		}
 		s, ok := a.(string)
 		if !ok {
@@ -123,14 +125,14 @@ func (handler *Handler) setListBuildInput(input *codebuild.StartBuildInput, data
 	return nil
 }
 
-func extractBuildList(data *Data, allElems []bspec.ListElement) ([]bspec.ListElement, error) {
+func extractBuildList(data *domain.Data, allElems []bspec.ListElement) ([]bspec.ListElement, error) {
 	listElems := []bspec.ListElement{}
 	for _, listElem := range allElems {
 		if listElem.If == nil {
 			listElems = append(listElems, listElem)
 			continue
 		}
-		f, err := runExpr(listElem.If, data)
+		f, err := domain.RunExpr(listElem.If, data)
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
 		}

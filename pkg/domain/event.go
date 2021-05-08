@@ -1,4 +1,4 @@
-package lambda
+package domain
 
 import (
 	"fmt"
@@ -50,7 +50,7 @@ type Data struct {
 	Lambuild          bspec.Lambuild
 }
 
-func runExpr(prog *vm.Program, data *Data) (interface{}, error) {
+func RunExpr(prog *vm.Program, data *Data) (interface{}, error) {
 	result, err := expr.Run(prog, setExprFuncs(map[string]interface{}{
 		"event":            data.Event,
 		"repo":             data.Repository,

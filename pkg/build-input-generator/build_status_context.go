@@ -1,4 +1,4 @@
-package lambda
+package generator
 
 import (
 	"bytes"
@@ -7,10 +7,11 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
 
-func (handler *Handler) setBuildStatusContext(data *Data, input *codebuild.StartBuildInput) error {
-	s, err := getBuildStatusContext(handler.Config.BuildStatusContext, data)
+func setBuildStatusContext(contxt *template.Template, data *domain.Data, input *codebuild.StartBuildInput) error {
+	s, err := getBuildStatusContext(contxt, data)
 	if err != nil || s == "" {
 		return err
 	}
@@ -20,7 +21,7 @@ func (handler *Handler) setBuildStatusContext(data *Data, input *codebuild.Start
 	return nil
 }
 
-func getBuildStatusContext(tpl *template.Template, data *Data) (string, error) {
+func getBuildStatusContext(tpl *template.Template, data *domain.Data) (string, error) {
 	if tpl == nil {
 		return "", nil
 	}

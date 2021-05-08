@@ -1,4 +1,4 @@
-package lambda
+package generator
 
 import (
 	"reflect"
@@ -7,15 +7,16 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
 
-func TestHandler_setGraphBuildInput(t *testing.T) {
+func Test_setGraphBuildInput(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title     string
 		input     codebuild.StartBuildInput
 		buildspec bspec.Buildspec
-		data      Data
+		data      domain.Data
 		elem      bspec.GraphElement
 		isErr     bool
 		exp       codebuild.StartBuildInput
@@ -57,8 +58,7 @@ func TestHandler_setGraphBuildInput(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			handler := Handler{}
-			err := handler.setGraphBuildInput(&d.input, &d.data, d.elem)
+			err := setGraphBuildInput(&d.input, nil, &d.data, d.elem)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")

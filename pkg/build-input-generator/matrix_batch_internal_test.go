@@ -1,4 +1,4 @@
-package lambda
+package generator
 
 import (
 	"reflect"
@@ -6,25 +6,26 @@ import (
 
 	"github.com/antonmedv/expr"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
+	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
 
-func Test_handler_handleMatrix(t *testing.T) {
+func Test_handleMatrix(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title      string
-		data       Data
+		data       domain.Data
 		expression string
 		exp        bool
 	}{
 		{
 			title: "normal",
-			data: Data{
-				PullRequest: PullRequest{
+			data: domain.Data{
+				PullRequest: domain.PullRequest{
 					ChangedFileNames: []string{"modules/README.md"},
 					LabelNames:       []string{},
 				},
-				Event: Event{
-					Headers: Headers{
+				Event: domain.Event{
+					Headers: domain.Headers{
 						Event: "pull_request",
 					},
 				},
@@ -46,7 +47,7 @@ func Test_handler_handleMatrix(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			a, err := runExpr(exp, &d.data)
+			a, err := domain.RunExpr(exp, &d.data)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -97,7 +98,7 @@ func Test_filterExprList(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title string
-		data  Data
+		data  domain.Data
 		src   bspec.ExprList
 		exp   bspec.ExprList
 	}{
