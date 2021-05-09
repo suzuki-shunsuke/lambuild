@@ -12,15 +12,17 @@ import (
 )
 
 var (
-	version  = ""
-	revision = "" //nolint:gochecknoglobals
+	version = ""
+	commit  = "" //nolint:gochecknoglobals
+	date    = "" //nolint:gochecknoglobals
 )
 
 func main() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	logrus.WithFields(logrus.Fields{
-		"version":  version,
-		"revision": revision,
+		"version":        version,
+		"built_revision": commit,
+		"built_date":     date,
 	}).Info("start program")
 	if err := core(); err != nil {
 		logrus.Fatal(err)
