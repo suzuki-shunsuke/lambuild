@@ -43,3 +43,7 @@
 ## Deploy Lambda Function
 
 Download a zip file from [GitHub Releases](https://github.com/suzuki-shunsuke/lambuild/releases) and deploy it to the Lambda Function.
+
+## Try lambuild
+
+Please see [example-lambuild#README](https://github.com/suzuki-shunsuke/example-lambuild/blob/main/README.md).
