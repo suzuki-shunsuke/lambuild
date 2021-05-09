@@ -2,7 +2,7 @@
 
 _Lambda => CodeBuild = lambuild_
 
-Trigger AWS CodeBuilds build with dynamic configuration based on the content of event and associated pull request with GitHub Webhook and Lambda Function.
+Trigger AWS CodeBuild's build with dynamic configuration based on the content of event and associated pull request with GitHub Webhook and Lambda Function.
 
 ## Link
 
