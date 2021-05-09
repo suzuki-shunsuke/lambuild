@@ -40,3 +40,13 @@ tasks:
   description: create a zip file
   usage: create a zip file
   script: goreleaser release --snapshot --rm-dist
+- name: release
+  short: r
+  description: release the new version
+  usage: release the new version
+  script: "bash scripts/release.sh {{.version}}"
+  args:
+  - name: version
+    required: true
+    validate:
+    - regexp: "^v\\d+\\.\\d+.\\d+(-\\d+)?$"
