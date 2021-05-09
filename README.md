@@ -1,5 +1,10 @@
 # lambuild
 
+[![Build Status](https://github.com/suzuki-shunsuke/lambuild/workflows/test/badge.svg)](https://github.com/suzuki-shunsuke/lambuild/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/suzuki-shunsuke/lambuild)](https://goreportcard.com/report/github.com/suzuki-shunsuke/lambuild)
+[![GitHub last commit](https://img.shields.io/github/last-commit/suzuki-shunsuke/lambuild.svg)](https://github.com/suzuki-shunsuke/lambuild)
+[![License](http://img.shields.io/badge/license-mit-blue.svg?style=flat-square)](https://raw.githubusercontent.com/suzuki-shunsuke/lambuild/master/LICENSE)
+
 _Lambda => CodeBuild = lambuild_
 
 Trigger AWS CodeBuild's build with dynamic configuration based on the content of event and associated pull request with GitHub Webhook and Lambda Function.
