@@ -1,0 +1,7 @@
+# Copy this file to terraform.tfvars
+# $ cp terraform.tfvars.template terraform.tfvars
+
+region                             = "us-east-1"
+repo_full_name                     = "octcat/test-lambuild"
+ssm_parameter_github_token_value   = ""
+ssm_parameter_webhook_secret_value = ""

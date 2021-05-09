@@ -1,0 +1,18 @@
+---
+log-level: debug
+region: "${region}"
+ssm-parameter:
+  parameter-name:
+    github-token: "${ssm_parameter_github_token_name}"
+    webhook-secret: "${ssm_parameter_webhook_secret_name}"
+repositories:
+  - name: "${repo_full_name}"
+    codebuild:
+      project-name: "${project_name}"
+    hooks:
+      - if: |
+          event.Headers.Event == "push" and
+          ref == "refs/heads/main"
+      - if: |
+          event.Headers.Event == "pull_request" and
+          event.Payload.GetAction() in ["opened", "edited", "reopend", "synchronize"]

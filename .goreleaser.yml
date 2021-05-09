@@ -1,0 +1,15 @@
+---
+archives:
+- name_template: "{{.ProjectName}}_{{.Os}}_{{.Arch}}"
+  format: zip
+builds:
+- binary: bootstrap
+  main: cmd/lambuild/main.go
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  goarch:
+  - amd64
+release:
+  prerelease: true

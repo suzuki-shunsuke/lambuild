@@ -1,0 +1,12 @@
+config.yaml
+/function.json
+/release.sh
+terraform.tfstate
+terraform.tfstate*
+terraform.tfvars
+.terraform
+/src
+/dist
+*.zip
+.terraform.lock.hcl
+.coverage
