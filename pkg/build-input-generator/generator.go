@@ -59,6 +59,41 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext template.Template, dat
 		})
 	}
 	buildInput.Build.EnvironmentVariablesOverride = envs
+
+	if !buildspec.Lambuild.BuildStatusContext.Empty() {
+		s, err := buildspec.Lambuild.BuildStatusContext.Execute(data.Convert())
+		if err != nil {
+			return buildInput, fmt.Errorf("render a build status context: %w", err)
+		}
+		buildInput.Build.BuildStatusConfigOverride = &codebuild.BuildStatusConfig{
+			Context: aws.String(s),
+		}
+	}
+
+	if buildspec.Lambuild.Image != "" {
+		buildInput.Build.ImageOverride = aws.String(buildspec.Lambuild.Image)
+	}
+
+	if buildspec.Lambuild.ComputeType != "" {
+		buildInput.Build.ComputeTypeOverride = aws.String(buildspec.Lambuild.ComputeType)
+	}
+
+	if buildspec.Lambuild.EnvironmentType != "" {
+		buildInput.Build.EnvironmentTypeOverride = aws.String(buildspec.Lambuild.EnvironmentType)
+	}
+
+	if buildspec.Lambuild.DebugSession != nil {
+		buildInput.Build.DebugSessionEnabled = buildspec.Lambuild.DebugSession
+	}
+
+	if buildspec.Lambuild.GitCloneDepth != nil {
+		buildInput.Build.GitCloneDepthOverride = buildspec.Lambuild.GitCloneDepth
+	}
+
+	if buildspec.Lambuild.PrivilegedMode != nil {
+		buildInput.Build.PrivilegedModeOverride = buildspec.Lambuild.PrivilegedMode
+	}
+
 	buildspec.Lambuild = bspec.Lambuild{}
 	builtContent, err := yaml.Marshal(&buildspec)
 	if err != nil {

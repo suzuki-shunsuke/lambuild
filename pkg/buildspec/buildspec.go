@@ -26,6 +26,15 @@ func (buildspec *Buildspec) MarshalYAML() (interface{}, error) {
 type Lambuild struct {
 	Env                LambuildEnv
 	BuildStatusContext template.Template `yaml:"build-status-context"`
+	Image              string
+	ComputeType        string `yaml:"compute-type"`
+	EnvironmentType    string `yaml:"environment-type"`
+	DebugSession       *bool  `yaml:"debug-session"`
+	PrivilegedMode     *bool  `yaml:"privileged-mode"`
+	GitCloneDepth      *int64 `yaml:"git-clone-depth"`
+	ReportBuildStatus  *bool  `yaml:"report-build-status"`
+	// It is danger to allow to override Service Role
+	// So lambuild doesn't support to override Service Role
 }
 
 type Batch struct {
