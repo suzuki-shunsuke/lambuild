@@ -26,7 +26,7 @@ func (str *String) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func NewString(s string) (String, error) {
-	prog, err := expr.Compile(s, expr.AsBool())
+	prog, err := expr.Compile(s)
 	if err != nil {
 		return String{}, fmt.Errorf("compile a program: %w", err)
 	}
