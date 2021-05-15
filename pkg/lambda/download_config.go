@@ -34,7 +34,7 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 	for i, file := range files {
 		filePath := file.GetPath()
 		ext := filepath.Ext(filePath)
-		if ext != "yaml" && ext != "yml" {
+		if ext != ".yaml" && ext != ".yml" {
 			continue
 		}
 		content, err := file.GetContent()
