@@ -3,6 +3,7 @@ package lambda
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
@@ -31,21 +32,29 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 	}
 	specs := make([]bspec.Buildspec, len(files))
 	for i, file := range files {
+		filePath := file.GetPath()
+		ext := filepath.Ext(filePath)
+		if ext != "yaml" && ext != "yml" {
+			continue
+		}
 		content, err := file.GetContent()
 		if err != nil {
 			return nil, fmt.Errorf("get a content: %w", err)
 		}
 		if content == "" {
-			f, _, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, file.GetPath(), &github.RepositoryContentGetOptions{Ref: data.Ref})
+			f, _, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, filePath, &github.RepositoryContentGetOptions{Ref: data.Ref})
 			if err != nil {
 				logE.WithFields(logrus.Fields{
-					"path": file.GetPath(),
+					"path": filePath,
 				}).WithError(err).Error("get a configuration file by GitHub API")
 				return nil, fmt.Errorf("get a configuration file by GitHub API: %w", err)
 			}
 			cnt, err := f.GetContent()
 			if err != nil {
 				return nil, fmt.Errorf("get a content: %w", err)
+			}
+			if cnt == "" {
+				return nil, fmt.Errorf("a content is empty (%s)", filePath)
 			}
 			content = cnt
 		}
