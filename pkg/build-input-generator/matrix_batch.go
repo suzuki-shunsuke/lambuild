@@ -84,7 +84,7 @@ func handleMatrix(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatus
 	}
 
 	// build
-	if err := setMatrixBuildInput(data, buildStatusContext, dynamic, buildInput.Build); err != nil {
+	if err := setMatrixBuildInput(data, buildStatusContext, dynamic, buildspec.Lambuild, buildInput.Build); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 	}
 
@@ -123,7 +123,7 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 	return size
 }
 
-func setMatrixBuildInput(data *domain.Data, buildStatusContext *template.Template, dynamic bspec.MatrixDynamic, input *codebuild.StartBuildInput) error {
+func setMatrixBuildInput(data *domain.Data, buildStatusContext *template.Template, dynamic bspec.MatrixDynamic, lambuild bspec.Lambuild, input *codebuild.StartBuildInput) error {
 	if err := setBuildStatusContext(buildStatusContext, data, input); err != nil {
 		return err
 	}
@@ -138,8 +138,8 @@ func setMatrixBuildInput(data *domain.Data, buildStatusContext *template.Templat
 		input.ComputeTypeOverride = aws.String(dynamic.Env.ComputeType[0].(string))
 	}
 
-	envMap := make(map[string]string, len(data.Lambuild.Env.Variables))
-	for k, prog := range data.Lambuild.Env.Variables {
+	envMap := make(map[string]string, len(lambuild.Env.Variables))
+	for k, prog := range lambuild.Env.Variables {
 		a, err := domain.RunExpr(prog, data)
 		if err != nil {
 			return fmt.Errorf("evaluate an expression: %w", err)

@@ -14,13 +14,12 @@ import (
 func Test_setListBuildInput(t *testing.T) {
 	t.Parallel()
 	data := []struct {
-		title     string
-		input     codebuild.StartBuildInput
-		buildspec bspec.Buildspec
-		data      domain.Data
-		elem      bspec.ListElement
-		isErr     bool
-		exp       codebuild.StartBuildInput
+		title string
+		input codebuild.StartBuildInput
+		data  domain.Data
+		elem  bspec.ListElement
+		isErr bool
+		exp   codebuild.StartBuildInput
 	}{
 		{
 			title: "minimum",
@@ -59,7 +58,7 @@ func Test_setListBuildInput(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			err := setListBuildInput(&d.input, nil, &d.data, d.elem)
+			err := setListBuildInput(&d.input, nil, &d.data, d.data.Lambuild, d.elem)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")
@@ -166,7 +165,7 @@ variables:
 				},
 			}
 
-			envs, err := getLambuildEnvVars(&data)
+			envs, err := getLambuildEnvVars(&data, data.Lambuild)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")

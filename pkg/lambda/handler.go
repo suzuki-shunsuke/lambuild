@@ -107,40 +107,41 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 		"config": hook.Config,
 	})
 
-	// get the configuration file from the target repository
-	buildspec, err := handler.getConfigFromRepo(ctx, logE, data, hook)
+	// get the configuration files from the target repository
+	buildspecs, err := handler.getConfigFromRepo(ctx, logE, data, hook)
 	if err != nil {
 		return err
 	}
 	logE.Debug("get a configuration file from the source repository")
 
-	buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
-	if err != nil {
-		return fmt.Errorf("generate a build input: %w", err)
-	}
+	for _, buildspec := range buildspecs {
+		buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
+		if err != nil {
+			return fmt.Errorf("generate a build input: %w", err)
+		}
 
-	if buildInput.Empty {
-		return nil
-	}
+		if buildInput.Empty {
+			return nil
+		}
 
-	if buildInput.Batched {
-		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
+		if buildInput.Batched {
+			buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
+			if err != nil {
+				return fmt.Errorf("start a batch build: %w", err)
+			}
+			logE.WithFields(logrus.Fields{
+				"build_arn": *buildOut.BuildBatch.Arn,
+			}).Info("start a batch build")
+			return nil
+		}
+
+		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, buildInput.Build)
 		if err != nil {
 			return fmt.Errorf("start a batch build: %w", err)
 		}
 		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.BuildBatch.Arn,
-		}).Info("start a batch build")
-		return nil
+			"build_arn": *buildOut.Build.Arn,
+		}).Info("start a build")
 	}
-
-	buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, buildInput.Build)
-	if err != nil {
-		return fmt.Errorf("start a batch build: %w", err)
-	}
-	logE.WithFields(logrus.Fields{
-		"build_arn": *buildOut.Build.Arn,
-	}).Info("start a build")
-
 	return nil
 }
