@@ -23,8 +23,8 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 	if err != nil {
 		logE.WithFields(logrus.Fields{
 			"path": hook.Config,
-		}).WithError(err).Error("")
-		return nil, fmt.Errorf("get a configuration file by GitHub API: %w", err)
+		}).WithError(err).Error("get configuration files by GitHub API")
+		return nil, fmt.Errorf("get configuration files by GitHub API: %w", err)
 	}
 	if file != nil {
 		files = []*github.RepositoryContent{file}
@@ -34,6 +34,20 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 		content, err := file.GetContent()
 		if err != nil {
 			return nil, fmt.Errorf("get a content: %w", err)
+		}
+		if content == "" {
+			f, _, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, file.GetPath(), &github.RepositoryContentGetOptions{Ref: data.Ref})
+			if err != nil {
+				logE.WithFields(logrus.Fields{
+					"path": file.GetPath(),
+				}).WithError(err).Error("get a configuration file by GitHub API")
+				return nil, fmt.Errorf("get a configuration file by GitHub API: %w", err)
+			}
+			cnt, err := f.GetContent()
+			if err != nil {
+				return nil, fmt.Errorf("get a content: %w", err)
+			}
+			content = cnt
 		}
 
 		m := map[string]interface{}{}

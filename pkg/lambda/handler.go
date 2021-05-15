@@ -113,7 +113,9 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 	if err != nil {
 		return err
 	}
-	logE.Debug("get a configuration file from the source repository")
+	logE.WithFields(logrus.Fields{
+		"number_of_buildspecs": len(buildspecs),
+	}).Debug("get configuration files from the source repository")
 
 	var eg errgroup.Group
 	for _, buildspec := range buildspecs {
