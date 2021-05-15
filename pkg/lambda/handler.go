@@ -11,6 +11,7 @@ import (
 	generator "github.com/suzuki-shunsuke/lambuild/pkg/build-input-generator"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"golang.org/x/sync/errgroup"
 )
 
 type Handler struct {
@@ -114,34 +115,45 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 	}
 	logE.Debug("get a configuration file from the source repository")
 
+	var eg errgroup.Group
 	for _, buildspec := range buildspecs {
-		buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
-		if err != nil {
-			return fmt.Errorf("generate a build input: %w", err)
-		}
-
-		if buildInput.Empty {
-			return nil
-		}
-
-		if buildInput.Batched {
-			buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
+		buildspec := buildspec
+		eg.Go(func() error {
+			buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
 			if err != nil {
-				return fmt.Errorf("start a batch build: %w", err)
+				logE.WithError(err).Error("generate a build input")
+				return fmt.Errorf("generate a build input: %w", err)
+			}
+
+			if buildInput.Empty {
+				return nil
+			}
+
+			if buildInput.Batched {
+				buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
+				if err != nil {
+					logE.WithError(err).Error("start a batch build")
+					return fmt.Errorf("start a batch build: %w", err)
+				}
+				logE.WithFields(logrus.Fields{
+					"build_arn": *buildOut.BuildBatch.Arn,
+				}).Info("start a batch build")
+				return nil
+			}
+
+			buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, buildInput.Build)
+			if err != nil {
+				logE.WithError(err).Error("start a build")
+				return fmt.Errorf("start a build: %w", err)
 			}
 			logE.WithFields(logrus.Fields{
-				"build_arn": *buildOut.BuildBatch.Arn,
-			}).Info("start a batch build")
+				"build_arn": *buildOut.Build.Arn,
+			}).Info("start a build")
 			return nil
-		}
-
-		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, buildInput.Build)
-		if err != nil {
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.Build.Arn,
-		}).Info("start a build")
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 	return nil
 }
