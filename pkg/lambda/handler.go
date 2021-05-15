@@ -154,8 +154,5 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 			return nil
 		})
 	}
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return eg.Wait() //nolint:wrapcheck
 }

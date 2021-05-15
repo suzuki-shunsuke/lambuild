@@ -58,7 +58,7 @@ func Test_setListBuildInput(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			err := setListBuildInput(&d.input, nil, &d.data, d.data.Lambuild, d.elem)
+			err := setListBuildInput(&d.input, nil, &d.data, bspec.Lambuild{}, d.elem)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")
@@ -159,13 +159,11 @@ variables:
 				t.Fatal(err)
 			}
 
-			data := domain.Data{
-				Lambuild: bspec.Lambuild{
-					Env: env,
-				},
-			}
+			data := domain.Data{}
 
-			envs, err := getLambuildEnvVars(&data, data.Lambuild)
+			envs, err := getLambuildEnvVars(&data, bspec.Lambuild{
+				Env: env,
+			})
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")

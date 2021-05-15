@@ -6,7 +6,6 @@ import (
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
 	"github.com/google/go-github/v35/github"
-	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 )
 
 type Event struct {
@@ -47,7 +46,6 @@ type Data struct {
 	Ref               string
 	GitHub            *github.Client
 	Commit            *github.Commit
-	Lambuild          bspec.Lambuild
 }
 
 func RunExpr(prog *vm.Program, data *Data) (interface{}, error) {

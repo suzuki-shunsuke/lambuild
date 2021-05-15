@@ -58,7 +58,7 @@ func Test_setGraphBuildInput(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			err := setGraphBuildInput(&d.input, nil, &d.data, d.data.Lambuild, d.elem)
+			err := setGraphBuildInput(&d.input, nil, &d.data, bspec.Lambuild{}, d.elem)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")
