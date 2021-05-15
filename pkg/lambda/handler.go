@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
@@ -132,6 +133,8 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 			}
 
 			if buildInput.Batched {
+				buildInput.BatchBuild.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+				buildInput.BatchBuild.SourceVersion = aws.String(data.SHA)
 				buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
 				if err != nil {
 					logE.WithError(err).Error("start a batch build")
@@ -143,14 +146,18 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 				return nil
 			}
 
-			buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, buildInput.Build)
-			if err != nil {
-				logE.WithError(err).Error("start a build")
-				return fmt.Errorf("start a build: %w", err)
+			for _, build := range buildInput.Builds {
+				build.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+				build.SourceVersion = aws.String(data.SHA)
+				buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, build)
+				if err != nil {
+					logE.WithError(err).Error("start a build")
+					return fmt.Errorf("start a build: %w", err)
+				}
+				logE.WithFields(logrus.Fields{
+					"build_arn": *buildOut.Build.Arn,
+				}).Info("start a build")
 			}
-			logE.WithFields(logrus.Fields{
-				"build_arn": *buildOut.Build.Arn,
-			}).Info("start a build")
 			return nil
 		})
 	}

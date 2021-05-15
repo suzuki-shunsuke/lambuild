@@ -83,10 +83,11 @@ func handleMatrix(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatus
 	}
 
 	// build
-	if err := setMatrixBuildInput(data, buildStatusContext, dynamic, buildspec.Lambuild, buildInput.Build); err != nil {
+	build := &codebuild.StartBuildInput{}
+	if err := setMatrixBuildInput(data, buildStatusContext, dynamic, buildspec.Lambuild, build); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 	}
-
+	buildInput.Builds = []*codebuild.StartBuildInput{build}
 	return nil
 }
 

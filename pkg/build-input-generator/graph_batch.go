@@ -25,10 +25,13 @@ func handleGraph(buildStatusContext template.Template, buildInput *domain.BuildI
 
 	if len(elems) == 1 {
 		elem := elems[0]
-		buildInput.Build.BuildspecOverride = aws.String(elem.Buildspec)
-		if err := setGraphBuildInput(buildInput.Build, buildStatusContext, data, buildspec.Lambuild, elem); err != nil {
+		build := &codebuild.StartBuildInput{
+			BuildspecOverride: aws.String(elem.Buildspec),
+		}
+		if err := setGraphBuildInput(build, buildStatusContext, data, buildspec.Lambuild, elem); err != nil {
 			return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 		}
+		buildInput.Builds = []*codebuild.StartBuildInput{build}
 		return nil
 	}
 

@@ -26,10 +26,13 @@ func handleList(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusCo
 
 	if len(listElems) == 1 {
 		elem := listElems[0]
-		buildInput.Build.BuildspecOverride = aws.String(elem.Buildspec)
-		if err := setListBuildInput(buildInput.Build, buildStatusContext, data, buildspec.Lambuild, elem); err != nil {
+		build := &codebuild.StartBuildInput{
+			BuildspecOverride: aws.String(elem.Buildspec),
+		}
+		if err := setListBuildInput(build, buildStatusContext, data, buildspec.Lambuild, elem); err != nil {
 			return fmt.Errorf("set a codebuild.StartBuildInput: %w", err)
 		}
+		buildInput.Builds = []*codebuild.StartBuildInput{build}
 		return nil
 	}
 

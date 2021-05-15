@@ -35,6 +35,7 @@ type Lambuild struct {
 	ReportBuildStatus  *bool  `yaml:"report-build-status"`
 	// It is danger to allow to override Service Role
 	// So lambuild doesn't support to override Service Role
+	Items []interface{}
 }
 
 type Batch struct {
