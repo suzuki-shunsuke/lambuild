@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"errors"
+	"fmt"
 	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -9,6 +11,7 @@ import (
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"gopkg.in/yaml.v2"
 )
 
 func GenerateInput(logE *logrus.Entry, buildStatusContext *template.Template, data *domain.Data, buildspec bspec.Buildspec, repo config.Repository) (domain.BuildInput, error) {
@@ -43,5 +46,30 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext *template.Template, da
 			return buildInput, err
 		}
 	}
+
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(buildspec.Lambuild.Env.Variables))
+	for k, prog := range buildspec.Lambuild.Env.Variables {
+		a, err := domain.RunExpr(prog, data)
+		if err != nil {
+			return buildInput, fmt.Errorf("evaluate an expression: %w", err)
+		}
+		s, ok := a.(string)
+		if !ok {
+			return buildInput, errors.New("the evaluated result must be string: lambuild.env." + k)
+		}
+
+		envs = append(envs, &codebuild.EnvironmentVariable{
+			Name:  aws.String(k),
+			Value: aws.String(s),
+		})
+	}
+	buildInput.Build.EnvironmentVariablesOverride = envs
+	buildspec.Lambuild = bspec.Lambuild{}
+	builtContent, err := yaml.Marshal(&buildspec)
+	if err != nil {
+		return buildInput, fmt.Errorf("marshal a buildspec: %w", err)
+	}
+	buildInput.Build.BuildspecOverride = aws.String(string(builtContent))
+
 	return buildInput, nil
 }
