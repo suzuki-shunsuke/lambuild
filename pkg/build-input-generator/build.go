@@ -22,11 +22,13 @@ func handleBuild(data *domain.Data, buildspec bspec.Buildspec) (domain.BuildInpu
 	}
 	builds := make([]*codebuild.StartBuildInput, 0, len(items))
 
-	for range items {
+	for _, item := range items {
 		build := &codebuild.StartBuildInput{}
 		envs := make([]*codebuild.EnvironmentVariable, 0, len(buildspec.Lambuild.Env.Variables))
+		param := data.Convert()
+		param["item"] = item
 		for k, prog := range buildspec.Lambuild.Env.Variables {
-			s, err := prog.Run(data.Convert())
+			s, err := prog.Run(param)
 			if err != nil {
 				return buildInput, fmt.Errorf("evaluate an expression: %w", err)
 			}
@@ -39,7 +41,7 @@ func handleBuild(data *domain.Data, buildspec bspec.Buildspec) (domain.BuildInpu
 		build.EnvironmentVariablesOverride = envs
 
 		if !buildspec.Lambuild.BuildStatusContext.Empty() {
-			s, err := buildspec.Lambuild.BuildStatusContext.Execute(data.Convert())
+			s, err := buildspec.Lambuild.BuildStatusContext.Execute(param)
 			if err != nil {
 				return buildInput, fmt.Errorf("render a build status context: %w", err)
 			}

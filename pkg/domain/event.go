@@ -44,7 +44,7 @@ type Data struct {
 	Commit            *github.Commit
 }
 
-func (data *Data) Convert() interface{} {
+func (data *Data) Convert() map[string]interface{} {
 	return setExprFuncs(map[string]interface{}{
 		"event":            data.Event,
 		"repo":             data.Repository,
