@@ -1,18 +1,18 @@
 package generator
 
 import (
-	"errors"
 	"fmt"
-	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
-func handleGraph(buildStatusContext *template.Template, buildInput *domain.BuildInput, logE *logrus.Entry, data *domain.Data, buildspec bspec.Buildspec) error {
+func handleGraph(buildStatusContext template.Template, buildInput *domain.BuildInput, logE *logrus.Entry, data *domain.Data, buildspec bspec.Buildspec) error {
 	elems, err := extractGraph(logE, data, buildspec.Batch.BuildGraph)
 	if err != nil {
 		return err
@@ -43,18 +43,18 @@ func handleGraph(buildStatusContext *template.Template, buildInput *domain.Build
 func extractGraph(logE *logrus.Entry, data *domain.Data, allElems []bspec.GraphElement) ([]bspec.GraphElement, error) {
 	identifiers := make(map[string]bspec.GraphElement, len(allElems))
 	for _, elem := range allElems {
-		if elem.If == nil {
+		if elem.If.Empty() {
 			identifiers[elem.Identifier] = elem
 			continue
 		}
-		f, err := domain.RunExpr(elem.If, data)
+		f, err := elem.If.Run(data.Convert())
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
 		}
-		if !f.(bool) {
+		if !f {
 			continue
 		}
-		elem.If = nil
+		elem.If = expr.Bool{}
 		identifiers[elem.Identifier] = elem
 	}
 	for {
@@ -88,7 +88,7 @@ func extractGraph(logE *logrus.Entry, data *domain.Data, allElems []bspec.GraphE
 	return elems, nil
 }
 
-func setGraphBuildInput(input *codebuild.StartBuildInput, buildStatusContext *template.Template, data *domain.Data, lambuild bspec.Lambuild, elem bspec.GraphElement) error { //nolint:dupl
+func setGraphBuildInput(input *codebuild.StartBuildInput, buildStatusContext template.Template, data *domain.Data, lambuild bspec.Lambuild, elem bspec.GraphElement) error { //nolint:dupl
 	if elem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}
@@ -111,13 +111,9 @@ func setGraphBuildInput(input *codebuild.StartBuildInput, buildStatusContext *te
 
 	envMap := make(map[string]string, len(elem.Env.Variables)+len(lambuild.Env.Variables))
 	for k, prog := range lambuild.Env.Variables {
-		a, err := domain.RunExpr(prog, data)
+		s, err := prog.Run(data.Convert())
 		if err != nil {
 			return fmt.Errorf("evaluate an expression: %w", err)
-		}
-		s, ok := a.(string)
-		if !ok {
-			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
 		envMap[k] = s
 	}

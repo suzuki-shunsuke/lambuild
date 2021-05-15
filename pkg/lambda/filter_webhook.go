@@ -1,8 +1,6 @@
 package lambda
 
 import (
-	"fmt"
-
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
@@ -20,14 +18,10 @@ func getRepo(repos []config.Repository, repoName string) (config.Repository, boo
 
 // matchHook returns true if data matches hook's condition.
 func matchHook(data *domain.Data, hook config.Hook) (bool, error) {
-	if hook.If == nil {
+	if hook.If.Empty() {
 		return true, nil
 	}
-	f, err := domain.RunExpr(hook.If, data)
-	if err != nil {
-		return false, fmt.Errorf("evaluate an expression: %w", err)
-	}
-	return f.(bool), nil
+	return hook.If.Run(data.Convert()) //nolint:wrapcheck
 }
 
 // getHook returns a hook configuration which data matches.

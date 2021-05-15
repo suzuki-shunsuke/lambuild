@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
 func Test_setGraphBuildInput(t *testing.T) {
@@ -58,7 +59,7 @@ func Test_setGraphBuildInput(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			err := setGraphBuildInput(&d.input, nil, &d.data, bspec.Lambuild{}, d.elem)
+			err := setGraphBuildInput(&d.input, template.Template{}, &d.data, bspec.Lambuild{}, d.elem)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")

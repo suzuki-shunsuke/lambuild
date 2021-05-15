@@ -1,18 +1,17 @@
 package generator
 
 import (
-	"errors"
 	"fmt"
-	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
-func handleMatrix(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusContext *template.Template, data *domain.Data, buildspec bspec.Buildspec) error { //nolint:gocognit
+func handleMatrix(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusContext template.Template, data *domain.Data, buildspec bspec.Buildspec) error { //nolint:gocognit
 	dynamic := buildspec.Batch.BuildMatrix.Dynamic
 	if len(dynamic.Buildspec) != 0 {
 		buildspecs, err := filterExprList(data, dynamic.Buildspec)
@@ -100,15 +99,15 @@ func filterExprList(data *domain.Data, src bspec.ExprList) (bspec.ExprList, erro
 			continue
 		}
 		a := bs.(bspec.ExprElem) //nolint:forcetypeassert
-		if a.If == nil {
+		if a.If.Empty() {
 			list = append(list, a.Value)
 			continue
 		}
-		f, err := domain.RunExpr(a.If, data)
+		f, err := a.If.Run(data.Convert())
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
 		}
-		if f.(bool) {
+		if f {
 			list = append(list, a.Value)
 		}
 	}
@@ -123,7 +122,7 @@ func getSizeOfEnvVars(m map[string]bspec.ExprList) int {
 	return size
 }
 
-func setMatrixBuildInput(data *domain.Data, buildStatusContext *template.Template, dynamic bspec.MatrixDynamic, lambuild bspec.Lambuild, input *codebuild.StartBuildInput) error {
+func setMatrixBuildInput(data *domain.Data, buildStatusContext template.Template, dynamic bspec.MatrixDynamic, lambuild bspec.Lambuild, input *codebuild.StartBuildInput) error {
 	if err := setBuildStatusContext(buildStatusContext, data, input); err != nil {
 		return err
 	}
@@ -140,13 +139,9 @@ func setMatrixBuildInput(data *domain.Data, buildStatusContext *template.Templat
 
 	envMap := make(map[string]string, len(lambuild.Env.Variables))
 	for k, prog := range lambuild.Env.Variables {
-		a, err := domain.RunExpr(prog, data)
+		s, err := prog.Run(data.Convert())
 		if err != nil {
 			return fmt.Errorf("evaluate an expression: %w", err)
-		}
-		s, ok := a.(string)
-		if !ok {
-			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
 		envMap[k] = s
 	}

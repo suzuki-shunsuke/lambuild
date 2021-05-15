@@ -1,7 +1,6 @@
 package lambda
 
 import (
-	"bytes"
 	"context"
 
 	"github.com/google/go-github/v35/github"
@@ -21,15 +20,15 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 	})
 
 	// generate a comment
-	buf := &bytes.Buffer{}
 	var cmt string
-	if renderErr := handler.Config.ErrorNotificationTemplate.Execute(buf, map[string]interface{}{
+	s, renderErr := handler.Config.ErrorNotificationTemplate.Execute(map[string]interface{}{
 		"Error": e,
-	}); renderErr != nil {
+	})
+	if renderErr != nil {
 		logE.WithError(renderErr).Error("render a comment to send it to the pull request")
 		cmt = "lambuild failed to procceed the request: " + e.Error()
 	} else {
-		cmt = buf.String()
+		cmt = s
 	}
 
 	if prNumber == 0 {

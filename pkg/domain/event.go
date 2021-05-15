@@ -1,10 +1,6 @@
 package domain
 
 import (
-	"fmt"
-
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
 	"github.com/google/go-github/v35/github"
 )
 
@@ -48,8 +44,8 @@ type Data struct {
 	Commit            *github.Commit
 }
 
-func RunExpr(prog *vm.Program, data *Data) (interface{}, error) {
-	result, err := expr.Run(prog, setExprFuncs(map[string]interface{}{
+func (data *Data) Convert() interface{} {
+	return setExprFuncs(map[string]interface{}{
 		"event":            data.Event,
 		"repo":             data.Repository,
 		"sha":              data.SHA,
@@ -61,11 +57,7 @@ func RunExpr(prog *vm.Program, data *Data) (interface{}, error) {
 		"getPRFiles":       data.GetPRFiles,
 		"getPRFileNames":   data.GetPRFileNames,
 		"getPRLabelNames":  data.GetPRLabelNames,
-	}))
-	if err != nil {
-		return nil, fmt.Errorf("evaluate a expr's compiled program: %w", err)
-	}
-	return result, nil
+	})
 }
 
 func (data *Data) CommitMessage() string {

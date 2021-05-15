@@ -31,7 +31,7 @@ config: foo.yaml
 			if hook.Config == "" {
 				t.Fatal("hook.Config is empty")
 			}
-			if hook.If == nil {
+			if hook.If.Empty() {
 				t.Fatal("hook.If is nil")
 			}
 		})
@@ -69,13 +69,13 @@ ssm-parameter:
 			if err := yaml.Unmarshal([]byte(d.src), &cfg); err != nil {
 				t.Fatal(err)
 			}
-			if cfg.LogLevel == 0 {
+			if cfg.LogLevel.Get() == 0 {
 				t.Fatal("config.LogLevel is empty")
 			}
-			if cfg.BuildStatusContext == nil {
+			if cfg.BuildStatusContext.Empty() {
 				t.Fatal("cfg.BuildStatusContext is nil")
 			}
-			if cfg.ErrorNotificationTemplate == nil {
+			if cfg.ErrorNotificationTemplate.Empty() {
 				t.Fatal("cfg.ErrorNotificationTemplate is nil")
 			}
 		})

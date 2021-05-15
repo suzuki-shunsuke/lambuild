@@ -3,12 +3,11 @@ package generator
 import (
 	"reflect"
 	"testing"
-	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
-	templ "github.com/suzuki-shunsuke/lambuild/pkg/template"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
 func Test_getBuildStatusContext(t *testing.T) {
@@ -35,9 +34,9 @@ func Test_getBuildStatusContext(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			var tpl *template.Template
+			var tpl template.Template
 			if d.tpl != "" {
-				tp, err := templ.Compile(d.tpl)
+				tp, err := template.New(d.tpl)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -83,9 +82,9 @@ func Test_setBuildStatusContext(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			var tpl *template.Template
+			var tpl template.Template
 			if d.tpl != "" {
-				tl, err := templ.Compile(d.tpl)
+				tl, err := template.New(d.tpl)
 				if err != nil {
 					t.Fatal(err)
 				}

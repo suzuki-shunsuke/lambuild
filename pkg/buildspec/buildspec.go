@@ -1,10 +1,8 @@
 package buildspec
 
 import (
-	"fmt"
-
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
+	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
 type Buildspec struct {
@@ -26,7 +24,8 @@ func (buildspec *Buildspec) MarshalYAML() (interface{}, error) {
 }
 
 type Lambuild struct {
-	Env LambuildEnv
+	Env                LambuildEnv
+	BuildStatusContext template.Template `yaml:"build-status-context"`
 }
 
 type Batch struct {
@@ -50,24 +49,5 @@ type Phase struct {
 }
 
 type LambuildEnv struct {
-	Variables map[string]*vm.Program
-}
-
-func (env *LambuildEnv) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	a := struct {
-		Variables map[string]string
-	}{}
-	if err := unmarshal(&a); err != nil {
-		return err
-	}
-	vars := make(map[string]*vm.Program, len(a.Variables))
-	for k, v := range a.Variables {
-		prog, err := expr.Compile(v)
-		if err != nil {
-			return fmt.Errorf("compile an expression: %s: %w", v, err)
-		}
-		vars[k] = prog
-	}
-	env.Variables = vars
-	return nil
+	Variables map[string]expr.String
 }

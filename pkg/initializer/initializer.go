@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
-	templ "github.com/suzuki-shunsuke/lambuild/pkg/template"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v2"
 )
@@ -25,8 +25,8 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 		return fmt.Errorf("read configuration from source: %w", err)
 	}
 
-	if cfg.LogLevel != 0 {
-		logrus.SetLevel(cfg.LogLevel)
+	if lvl := cfg.LogLevel.Get(); lvl != 0 {
+		logrus.SetLevel(lvl)
 	}
 
 	if err := validateRepositories(cfg.Repositories); err != nil {
@@ -54,9 +54,9 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 		}
 	}
 
-	if cfg.BuildStatusContext == nil {
+	if cfg.BuildStatusContext.Empty() {
 		if cntxt := os.Getenv("BUILD_STATUS_CONTEXT"); cntxt != "" {
-			tpl, err := templ.Compile(cntxt)
+			tpl, err := template.New(cntxt)
 			if err != nil {
 				return fmt.Errorf("parse BUILD_STATUS_CONTEXT as template (%s): %w", cntxt, err)
 			}
@@ -129,18 +129,18 @@ Please check.
 ` + "```"
 
 func setErrorNotificationTemplate(cfg *config.Config) error {
-	if cfg.ErrorNotificationTemplate != nil {
+	if !cfg.ErrorNotificationTemplate.Empty() {
 		return nil
 	}
 	if errTpl := os.Getenv("ERROR_NOTIFICATION_TEMPLATE"); errTpl != "" {
-		tpl, err := templ.Compile(errTpl)
+		tpl, err := template.New(errTpl)
 		if err != nil {
 			return fmt.Errorf("parse ERROR_NOTIFICATION_TEMPLATE as template: %w", err)
 		}
 		cfg.ErrorNotificationTemplate = tpl
 		return nil
 	}
-	tpl, err := templ.Compile(defaultErrorNotificationTemplate)
+	tpl, err := template.New(defaultErrorNotificationTemplate)
 	if err != nil {
 		return fmt.Errorf("parse defaultErroNotificationTemplate as template: %w", err)
 	}

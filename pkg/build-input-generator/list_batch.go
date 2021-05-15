@@ -1,19 +1,19 @@
 package generator
 
 import (
-	"errors"
 	"fmt"
-	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 	"gopkg.in/yaml.v2"
 )
 
-func handleList(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusContext *template.Template, data *domain.Data, buildspec bspec.Buildspec) error {
+func handleList(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusContext template.Template, data *domain.Data, buildspec bspec.Buildspec) error {
 	listElems, err := extractBuildList(data, buildspec.Batch.BuildList)
 	if err != nil {
 		return err
@@ -44,13 +44,9 @@ func handleList(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusCo
 func getLambuildEnvVars(data *domain.Data, lambuild bspec.Lambuild) ([]*codebuild.EnvironmentVariable, error) {
 	envs := make([]*codebuild.EnvironmentVariable, 0, len(lambuild.Env.Variables))
 	for k, prog := range lambuild.Env.Variables {
-		a, err := domain.RunExpr(prog, data)
+		s, err := prog.Run(data.Convert())
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
-		}
-		s, ok := a.(string)
-		if !ok {
-			return nil, errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
 		envs = append(envs, &codebuild.EnvironmentVariable{
 			Name:  aws.String(k),
@@ -77,7 +73,7 @@ func setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.B
 	return nil
 }
 
-func setListBuildInput(input *codebuild.StartBuildInput, contx *template.Template, data *domain.Data, lambuild bspec.Lambuild, elem bspec.ListElement) error { //nolint:dupl
+func setListBuildInput(input *codebuild.StartBuildInput, contx template.Template, data *domain.Data, lambuild bspec.Lambuild, elem bspec.ListElement) error { //nolint:dupl
 	if elem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}
@@ -100,13 +96,9 @@ func setListBuildInput(input *codebuild.StartBuildInput, contx *template.Templat
 
 	envMap := make(map[string]string, len(elem.Env.Variables)+len(lambuild.Env.Variables))
 	for k, prog := range lambuild.Env.Variables {
-		a, err := domain.RunExpr(prog, data)
+		s, err := prog.Run(data.Convert())
 		if err != nil {
 			return fmt.Errorf("evaluate an expression: %w", err)
-		}
-		s, ok := a.(string)
-		if !ok {
-			return errors.New("the evaluated result must be string: lambuild.env." + k)
 		}
 		envMap[k] = s
 	}
@@ -129,18 +121,18 @@ func setListBuildInput(input *codebuild.StartBuildInput, contx *template.Templat
 func extractBuildList(data *domain.Data, allElems []bspec.ListElement) ([]bspec.ListElement, error) {
 	listElems := []bspec.ListElement{}
 	for _, listElem := range allElems {
-		if listElem.If == nil {
+		if listElem.If.Empty() {
 			listElems = append(listElems, listElem)
 			continue
 		}
-		f, err := domain.RunExpr(listElem.If, data)
+		f, err := listElem.If.Run(data.Convert())
 		if err != nil {
 			return nil, fmt.Errorf("evaluate an expression: %w", err)
 		}
-		if !f.(bool) {
+		if !f {
 			continue
 		}
-		listElem.If = nil
+		listElem.If = expr.Bool{}
 		listElems = append(listElems, listElem)
 	}
 	return listElems, nil

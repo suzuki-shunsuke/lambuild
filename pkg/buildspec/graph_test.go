@@ -31,7 +31,7 @@ identifier: validate
 			if elem.Identifier == "" {
 				t.Fatal("elem.Identifier is empty")
 			}
-			if elem.If == nil {
+			if elem.If.Empty() {
 				t.Fatal("elem.If is nil")
 			}
 		})
