@@ -7,6 +7,7 @@ import (
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
+	"github.com/suzuki-shunsuke/lambuild/pkg/mutex"
 )
 
 func Test_handleMatrix(t *testing.T) {
@@ -21,8 +22,8 @@ func Test_handleMatrix(t *testing.T) {
 			title: "normal",
 			data: domain.Data{
 				PullRequest: domain.PullRequest{
-					ChangedFileNames: domain.NewStringListMutex("modules/README.md"),
-					LabelNames:       domain.NewStringListMutex(""),
+					ChangedFileNames: mutex.NewStringList("modules/README.md"),
+					LabelNames:       mutex.NewStringList(""),
 				},
 				Event: domain.Event{
 					Headers: domain.Headers{

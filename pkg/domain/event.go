@@ -2,6 +2,7 @@ package domain
 
 import (
 	"github.com/google/go-github/v35/github"
+	"github.com/suzuki-shunsuke/lambuild/pkg/mutex"
 )
 
 type Event struct {
@@ -18,20 +19,20 @@ type Headers struct {
 }
 
 type PullRequest struct {
-	ChangedFileNames StringListMutex
-	LabelNames       StringListMutex
-	PullRequest      PRMutex
-	Files            CommitFilesMutex
-	Number           IntMutex
+	ChangedFileNames mutex.StringList
+	LabelNames       mutex.StringList
+	PullRequest      mutex.PR
+	Files            mutex.CommitFiles
+	Number           mutex.Int
 }
 
 func NewPullRequest() PullRequest {
 	return PullRequest{
-		ChangedFileNames: NewStringListMutex(),
-		LabelNames:       NewStringListMutex(),
-		PullRequest:      NewPRMutex(),
-		Files:            NewCommitFilesMutex(),
-		Number:           NewIntMutex(),
+		ChangedFileNames: mutex.NewStringList(),
+		LabelNames:       mutex.NewStringList(),
+		PullRequest:      mutex.NewPR(),
+		Files:            mutex.NewCommitFiles(),
+		Number:           mutex.NewInt(),
 	}
 }
 
@@ -47,17 +48,17 @@ type Data struct {
 	Event             Event
 	PullRequest       PullRequest
 	Repository        Repository
-	HeadCommitMessage StringMutex
+	HeadCommitMessage mutex.String
 	SHA               string
 	Ref               string
 	GitHub            *github.Client
-	Commit            CommitMutex
+	Commit            mutex.Commit
 }
 
 func NewData() Data {
 	return Data{
-		Commit:            NewCommitMutex(),
-		HeadCommitMessage: NewStringMutex(""),
+		Commit:            mutex.NewCommit(),
+		HeadCommitMessage: mutex.NewString(""),
 		PullRequest:       NewPullRequest(),
 	}
 }
