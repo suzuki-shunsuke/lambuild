@@ -87,6 +87,14 @@ func handleMatrix(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatus
 	if err := setMatrixBuildInput(data, buildStatusContext, dynamic, buildspec.Lambuild, build); err != nil {
 		return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 	}
+	if build.BuildspecOverride == nil {
+		buildspec.Batch = bspec.Batch{}
+		s, err := buildspec.ToYAML(data.Convert())
+		if err != nil {
+			return fmt.Errorf("render a buildspec: %w", err)
+		}
+		build.BuildspecOverride = aws.String(string(s))
+	}
 	buildInput.Builds = []*codebuild.StartBuildInput{build}
 	return nil
 }

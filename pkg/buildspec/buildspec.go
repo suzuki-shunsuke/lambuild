@@ -1,8 +1,11 @@
 package buildspec
 
 import (
+	"fmt"
+
 	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
 	"github.com/suzuki-shunsuke/lambuild/pkg/template"
+	"gopkg.in/yaml.v2"
 )
 
 type Buildspec struct {
@@ -12,9 +15,12 @@ type Buildspec struct {
 	Phases   Phases
 }
 
-func (buildspec *Buildspec) Filter(param interface{}) (map[string]interface{}, error) {
+func (buildspec *Buildspec) filter(param interface{}) (map[string]interface{}, error) {
 	m := make(map[string]interface{}, len(buildspec.Map)+2) //nolint:gomnd
 	for k, v := range buildspec.Map {
+		if k == "lambuild" {
+			continue
+		}
 		m[k] = v
 	}
 	m["batch"] = buildspec.Batch
@@ -24,6 +30,19 @@ func (buildspec *Buildspec) Filter(param interface{}) (map[string]interface{}, e
 	}
 	m["phases"] = phases
 	return m, nil
+}
+
+func (buildspec *Buildspec) ToYAML(param interface{}) ([]byte, error) {
+	m, err := buildspec.filter(param)
+	if err != nil {
+		return nil, fmt.Errorf("filter commands from buildspec: %w", err)
+	}
+
+	builtContent, err := yaml.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal a buildspec: %w", err)
+	}
+	return builtContent, nil
 }
 
 func (buildspec *Buildspec) MarshalYAML() (interface{}, error) {

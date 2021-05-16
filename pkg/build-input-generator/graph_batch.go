@@ -23,14 +23,23 @@ func handleGraph(buildStatusContext template.Template, buildInput *domain.BuildI
 		return nil
 	}
 
-	if len(elems) == 1 {
+	if len(elems) == 1 { //nolint:nestif
 		elem := elems[0]
-		build := &codebuild.StartBuildInput{
-			BuildspecOverride: aws.String(elem.Buildspec),
-		}
+		build := &codebuild.StartBuildInput{}
 		if err := setGraphBuildInput(build, buildStatusContext, data, buildspec.Lambuild, elem); err != nil {
 			return fmt.Errorf("set codebuild.StartBuildInput: %w", err)
 		}
+		if elem.Buildspec == "" {
+			buildspec.Batch = bspec.Batch{}
+			s, err := buildspec.ToYAML(data.Convert())
+			if err != nil {
+				return fmt.Errorf("render a buildspec: %w", err)
+			}
+			build.BuildspecOverride = aws.String(string(s))
+		} else {
+			build.BuildspecOverride = aws.String(elem.Buildspec)
+		}
+
 		buildInput.Builds = []*codebuild.StartBuildInput{build}
 		return nil
 	}

@@ -33,6 +33,7 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext template.Template, dat
 		if err := handleGraph(buildStatusContext, &buildInput, logE, data, buildspec); err != nil {
 			return buildInput, err
 		}
+		return buildInput, nil
 	}
 
 	if len(buildspec.Batch.BuildList) != 0 {
@@ -40,6 +41,7 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext template.Template, dat
 		if err := handleList(&buildInput, logE, buildStatusContext, data, buildspec); err != nil {
 			return buildInput, err
 		}
+		return buildInput, nil
 	}
 
 	if !buildspec.Batch.BuildMatrix.Empty() {
@@ -47,6 +49,7 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext template.Template, dat
 		if err := handleMatrix(&buildInput, logE, buildStatusContext, data, buildspec); err != nil {
 			return buildInput, err
 		}
+		return buildInput, nil
 	}
 
 	return handleBuild(data, buildspec)

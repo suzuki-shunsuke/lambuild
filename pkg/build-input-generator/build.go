@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
-	"gopkg.in/yaml.v2"
 )
 
 func handleBuild(data *domain.Data, buildspec bspec.Buildspec) (domain.BuildInput, error) {
@@ -125,12 +124,7 @@ func handleBuildItem(data *domain.Data, buildspec bspec.Buildspec, item bspec.It
 		build.PrivilegedModeOverride = buildspec.Lambuild.PrivilegedMode
 	}
 
-	m, err := buildspec.Filter(param)
-	if err != nil {
-		return build, fmt.Errorf("filter commands from buildspec: %w", err)
-	}
-
-	builtContent, err := yaml.Marshal(m)
+	builtContent, err := buildspec.ToYAML(param)
 	if err != nil {
 		return build, fmt.Errorf("marshal a buildspec: %w", err)
 	}
