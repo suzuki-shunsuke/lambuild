@@ -35,7 +35,18 @@ type Lambuild struct {
 	ReportBuildStatus  *bool  `yaml:"report-build-status"`
 	// It is danger to allow to override Service Role
 	// So lambuild doesn't support to override Service Role
-	Items []interface{}
+	Items []Item
+	If    expr.Bool
+}
+
+type Item struct {
+	If                 expr.Bool
+	Env                LambuildEnv
+	BuildStatusContext template.Template `yaml:"build-status-context"`
+	Image              string
+	ComputeType        string `yaml:"compute-type"`
+	EnvironmentType    string `yaml:"environment-type"`
+	Param              map[string]interface{}
 }
 
 type Batch struct {

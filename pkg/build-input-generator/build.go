@@ -14,10 +14,11 @@ func handleBuild(data *domain.Data, buildspec bspec.Buildspec) (domain.BuildInpu
 	buildInput := domain.BuildInput{
 		BatchBuild: &codebuild.StartBuildBatchInput{},
 	}
+
 	items := buildspec.Lambuild.Items
 	if len(items) == 0 {
-		items = []interface{}{
-			map[string]interface{}{},
+		items = []bspec.Item{
+			{},
 		}
 	}
 	builds := make([]*codebuild.StartBuildInput, 0, len(items))
@@ -27,31 +28,64 @@ func handleBuild(data *domain.Data, buildspec bspec.Buildspec) (domain.BuildInpu
 		if err != nil {
 			return buildInput, err
 		}
-		builds = append(builds, &build)
+		if build.BuildspecOverride != nil {
+			builds = append(builds, &build)
+		}
 	}
 	buildInput.Builds = builds
 	return buildInput, nil
 }
 
-func handleBuildItem(data *domain.Data, buildspec bspec.Buildspec, item interface{}) (codebuild.StartBuildInput, error) {
+func handleBuildItem(data *domain.Data, buildspec bspec.Buildspec, item bspec.Item) (codebuild.StartBuildInput, error) {
 	build := codebuild.StartBuildInput{}
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(buildspec.Lambuild.Env.Variables))
 	param := data.Convert()
-	param["item"] = item
+	param["item"] = item.Param
+
+	if !item.If.Empty() {
+		f, err := item.If.Run(param)
+		if err != nil {
+			return build, fmt.Errorf("evaluate item.If: %w", err)
+		}
+		if !f {
+			return build, nil
+		}
+	}
+
+	envMap := map[string]string{}
 	for k, prog := range buildspec.Lambuild.Env.Variables {
 		s, err := prog.Run(param)
 		if err != nil {
 			return build, fmt.Errorf("evaluate an expression: %w", err)
 		}
+		envMap[k] = s
+	}
 
+	for k, prog := range item.Env.Variables {
+		s, err := prog.Run(param)
+		if err != nil {
+			return build, fmt.Errorf("evaluate an expression: %w", err)
+		}
+		envMap[k] = s
+	}
+
+	envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
+	for k, v := range envMap {
 		envs = append(envs, &codebuild.EnvironmentVariable{
 			Name:  aws.String(k),
-			Value: aws.String(s),
+			Value: aws.String(v),
 		})
 	}
 	build.EnvironmentVariablesOverride = envs
 
-	if !buildspec.Lambuild.BuildStatusContext.Empty() {
+	if !item.BuildStatusContext.Empty() {
+		s, err := item.BuildStatusContext.Execute(param)
+		if err != nil {
+			return build, fmt.Errorf("render a build status context: %w", err)
+		}
+		build.BuildStatusConfigOverride = &codebuild.BuildStatusConfig{
+			Context: aws.String(s),
+		}
+	} else if !buildspec.Lambuild.BuildStatusContext.Empty() {
 		s, err := buildspec.Lambuild.BuildStatusContext.Execute(param)
 		if err != nil {
 			return build, fmt.Errorf("render a build status context: %w", err)
@@ -61,15 +95,21 @@ func handleBuildItem(data *domain.Data, buildspec bspec.Buildspec, item interfac
 		}
 	}
 
-	if buildspec.Lambuild.Image != "" {
+	if item.Image != "" {
+		build.ImageOverride = aws.String(item.Image)
+	} else if buildspec.Lambuild.Image != "" {
 		build.ImageOverride = aws.String(buildspec.Lambuild.Image)
 	}
 
-	if buildspec.Lambuild.ComputeType != "" {
+	if item.ComputeType != "" {
+		build.ComputeTypeOverride = aws.String(item.ComputeType)
+	} else if buildspec.Lambuild.ComputeType != "" {
 		build.ComputeTypeOverride = aws.String(buildspec.Lambuild.ComputeType)
 	}
 
-	if buildspec.Lambuild.EnvironmentType != "" {
+	if item.EnvironmentType != "" {
+		build.EnvironmentTypeOverride = aws.String(item.EnvironmentType)
+	} else if buildspec.Lambuild.EnvironmentType != "" {
 		build.EnvironmentTypeOverride = aws.String(buildspec.Lambuild.EnvironmentType)
 	}
 
