@@ -31,8 +31,8 @@ func extractPRFileNames(files []*github.CommitFile) []string {
 	return arr
 }
 
-func getPRNumber(ctx context.Context, owner, repo, sha string, client *github.Client) (int, error) {
-	prs, _, err := client.PullRequests.ListPullRequestsWithCommit(ctx, owner, repo, sha, nil)
+func getPRNumber(ctx context.Context, owner, repo, sha string, client GitHub) (int, error) {
+	prs, err := client.GetPRsWithCommit(ctx, owner, repo, sha)
 	if err != nil {
 		return 0, fmt.Errorf("list pull requests with a commit: %w", err)
 	}
@@ -44,28 +44,26 @@ func getPRNumber(ctx context.Context, owner, repo, sha string, client *github.Cl
 
 const maxPerPage = 100
 
-func getPRFiles(ctx context.Context, client *github.Client, owner, repo string, prNum, fileSize int) ([]*github.CommitFile, *github.Response, error) {
+func getPRFiles(ctx context.Context, client GitHub, owner, repo string, prNum, fileSize int) ([]*github.CommitFile, error) {
 	ret := []*github.CommitFile{}
 	if fileSize == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 	n := (fileSize / maxPerPage) + 1
-	var gResp *github.Response
 	for i := 1; i <= n; i++ {
 		opts := &github.ListOptions{
 			Page:    i,
 			PerPage: maxPerPage,
 		}
-		files, resp, err := client.PullRequests.ListFiles(ctx, owner, repo, prNum, opts)
+		files, err := client.GetPRFiles(ctx, owner, repo, prNum, opts)
 		if err != nil {
-			return files, resp, fmt.Errorf("get pull request files (page: %d, per_page: %d): %w", opts.Page, opts.PerPage, err)
+			return files, fmt.Errorf("get pull request files (page: %d, per_page: %d): %w", opts.Page, opts.PerPage, err)
 		}
-		gResp = resp
 		ret = append(ret, files...)
 		if len(files) != maxPerPage {
-			return ret, gResp, nil
+			return ret, nil
 		}
 	}
 
-	return ret, gResp, nil
+	return ret, nil
 }

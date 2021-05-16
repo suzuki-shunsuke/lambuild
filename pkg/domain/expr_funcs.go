@@ -23,7 +23,7 @@ func (data *Data) GetCommit() *github.Commit {
 	if cmt := data.Commit.Get(); cmt != nil {
 		return cmt
 	}
-	commit, _, err := data.GitHub.Git.GetCommit(context.Background(), data.Repository.Owner, data.Repository.Name, data.SHA)
+	commit, err := data.GitHub.GetCommit(context.Background(), data.Repository.Owner, data.Repository.Name, data.SHA)
 	if err != nil {
 		panic(err)
 	}
@@ -53,7 +53,7 @@ func (data *Data) GetPRNumber() int {
 func (data *Data) GetPR() *github.PullRequest {
 	pr := data.PullRequest.PullRequest.Get()
 	if pr == nil {
-		p, _, err := data.GitHub.PullRequests.Get(context.Background(), data.Repository.Owner, data.Repository.Name, data.GetPRNumber())
+		p, err := data.GitHub.GetPR(context.Background(), data.Repository.Owner, data.Repository.Name, data.GetPRNumber())
 		if err != nil {
 			panic(err)
 		}
@@ -67,7 +67,7 @@ func (data *Data) GetPRFiles() []*github.CommitFile {
 	if files := data.PullRequest.Files.Get(); files != nil {
 		return files
 	}
-	files, _, err := getPRFiles(context.Background(), data.GitHub, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.GetPR().GetChangedFiles())
+	files, err := getPRFiles(context.Background(), data.GitHub, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.GetPR().GetChangedFiles())
 	if err != nil {
 		panic(err)
 	}

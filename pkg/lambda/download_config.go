@@ -20,7 +20,7 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 		// set the default value
 		hook.Config = "lambuild.yaml"
 	}
-	file, files, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, hook.Config, &github.RepositoryContentGetOptions{Ref: data.Ref})
+	file, files, err := handler.GitHub.GetContents(ctx, data.Repository.Owner, data.Repository.Name, hook.Config, data.Ref)
 	if err != nil {
 		logE.WithFields(logrus.Fields{
 			"path": hook.Config,
@@ -42,7 +42,7 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 			return nil, fmt.Errorf("get a content: %w", err)
 		}
 		if content == "" {
-			f, _, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, filePath, &github.RepositoryContentGetOptions{Ref: data.Ref})
+			f, _, err := handler.GitHub.GetContents(ctx, data.Repository.Owner, data.Repository.Name, filePath, data.Ref)
 			if err != nil {
 				logE.WithFields(logrus.Fields{
 					"path": filePath,

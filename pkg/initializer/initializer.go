@@ -10,12 +10,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
+	gh "github.com/suzuki-shunsuke/lambuild/pkg/github"
 	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
 	"github.com/suzuki-shunsuke/lambuild/pkg/template"
-	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v2"
 )
 
@@ -78,9 +77,8 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 	}
 	handler.Secret = secret
 
-	handler.GitHub = github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: handler.Secret.GitHubToken},
-	)))
+	ghClient := gh.New(ctx, handler.Secret.GitHubToken)
+	handler.GitHub = &ghClient
 	handler.CodeBuild = codebuild.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
 	return nil
 }

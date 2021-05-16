@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
@@ -18,8 +19,13 @@ import (
 type Handler struct {
 	Config    config.Config
 	Secret    Secret
-	GitHub    *github.Client
-	CodeBuild *codebuild.CodeBuild
+	GitHub    domain.GitHub
+	CodeBuild CodeBuild
+}
+
+type CodeBuild interface {
+	StartBuildBatchWithContext(ctx aws.Context, input *codebuild.StartBuildBatchInput, opts ...request.Option) (*codebuild.StartBuildBatchOutput, error)
+	StartBuildWithContext(ctx aws.Context, input *codebuild.StartBuildInput, opts ...request.Option) (*codebuild.StartBuildOutput, error)
 }
 
 type Secret struct {

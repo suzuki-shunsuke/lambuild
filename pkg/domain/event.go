@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"context"
+
 	"github.com/google/go-github/v35/github"
 	"github.com/suzuki-shunsuke/lambuild/pkg/mutex"
 )
@@ -51,8 +53,18 @@ type Data struct {
 	HeadCommitMessage mutex.String
 	SHA               string
 	Ref               string
-	GitHub            *github.Client
+	GitHub            GitHub
 	Commit            mutex.Commit
+}
+
+type GitHub interface {
+	GetCommit(ctx context.Context, owner, repo, sha string) (*github.Commit, error)
+	GetPR(ctx context.Context, owner, repo string, number int) (*github.PullRequest, error)
+	GetPRFiles(ctx context.Context, owner, repo string, number int, opt *github.ListOptions) ([]*github.CommitFile, error)
+	GetPRsWithCommit(ctx context.Context, owner, repo string, sha string) ([]*github.PullRequest, error)
+	GetContents(ctx context.Context, owner, repo, path, ref string) (*github.RepositoryContent, []*github.RepositoryContent, error)
+	CreateCommitComment(ctx context.Context, owner, repo, sha, body string) error
+	CreatePRComment(ctx context.Context, owner, repo string, number int, body string) error
 }
 
 func NewData() Data {
