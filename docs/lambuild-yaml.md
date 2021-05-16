@@ -36,6 +36,9 @@ phases:
   build:
     commands:
       - echo "foo"
+      - command: echo "main"
+        if: |
+          ref == "refs/heads/main" # main branch
 ```
 
 ## Reference
@@ -51,6 +54,10 @@ path | type | example | description
 .lambuild.privileged-mode | bool | |
 .lambuild.report-build-status | bool | |
 .lambuild.items | []Item | |
+.phases.install.commands | [][Command](#type-command) | |
+.phases.pre_build.commands | [][Command](#type-command) | |
+.phases.build.commands | [][Command](#type-command) | |
+.phases.post_build.commands | [][Command](#type-command) | |
 
 * `type: bool expression` is a string whose evaluated result is a boolean
 * `type: string expression` is a string whose evaluated result is a string
@@ -74,3 +81,26 @@ path | type | example | description
 .compute-type | string | `BUILD_GENERAL1_SMALL` |
 .environment-type | string | `LINUX_CONTAINER` |
 .param | `map[string]interface{}` | | a parameter `item` of template and expression
+
+## type: Command
+
+string or following struct
+
+path | type | example | description
+--- | --- | --- | ---
+.command | string | `echo "hello"` |
+.if | bool expression | |
+
+Command is ignored when the evaluated result of `.if` is `false`.
+
+e.g.
+
+```yaml
+phases:
+  build:
+    commands:
+      - echo "run always"
+      - command: bash release.sh
+        if: |
+          ref == "refs/heads/main" # main branch
+```

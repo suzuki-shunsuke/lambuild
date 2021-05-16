@@ -9,6 +9,21 @@ type Buildspec struct {
 	Batch    Batch                  `yaml:",omitempty"`
 	Lambuild Lambuild               `yaml:",omitempty"`
 	Map      map[string]interface{} `yaml:"-"`
+	Phases   Phases
+}
+
+func (buildspec *Buildspec) Filter(param interface{}) (map[string]interface{}, error) {
+	m := make(map[string]interface{}, len(buildspec.Map)+2) //nolint:gomnd
+	for k, v := range buildspec.Map {
+		m[k] = v
+	}
+	m["batch"] = buildspec.Batch
+	phases, err := buildspec.Phases.Filter(param)
+	if err != nil {
+		return nil, err
+	}
+	m["phases"] = phases
+	return m, nil
 }
 
 func (buildspec *Buildspec) MarshalYAML() (interface{}, error) {
@@ -49,6 +64,10 @@ type Item struct {
 	Param              map[string]interface{}
 }
 
+type LambuildEnv struct {
+	Variables map[string]expr.String
+}
+
 type Batch struct {
 	BuildGraph  []GraphElement `yaml:"build-graph,omitempty"`
 	BuildList   []ListElement  `yaml:"build-list,omitempty"`
@@ -62,13 +81,8 @@ type Env struct {
 }
 
 type Phases struct {
-	Build Phase `yaml:",omitempty"`
-}
-
-type Phase struct {
-	Commands []string `yaml:",omiempty"`
-}
-
-type LambuildEnv struct {
-	Variables map[string]expr.String
+	Install   Phase `yaml:",omitempty"`
+	PreBuild  Phase `yaml:"pre_build,omitempty"`
+	Build     Phase `yaml:",omitempty"`
+	PostBuild Phase `yaml:"post_build,omitempty"`
 }

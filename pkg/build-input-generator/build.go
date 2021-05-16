@@ -125,7 +125,12 @@ func handleBuildItem(data *domain.Data, buildspec bspec.Buildspec, item bspec.It
 		build.PrivilegedModeOverride = buildspec.Lambuild.PrivilegedMode
 	}
 
-	builtContent, err := yaml.Marshal(&buildspec)
+	m, err := buildspec.Filter(param)
+	if err != nil {
+		return build, fmt.Errorf("filter commands from buildspec: %w", err)
+	}
+
+	builtContent, err := yaml.Marshal(m)
 	if err != nil {
 		return build, fmt.Errorf("marshal a buildspec: %w", err)
 	}
