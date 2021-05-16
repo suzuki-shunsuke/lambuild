@@ -20,49 +20,57 @@ func setExprFuncs(env map[string]interface{}) map[string]interface{} {
 }
 
 func (data *Data) GetCommit() *github.Commit {
-	if data.Commit == nil {
-		commit, _, err := data.GitHub.Git.GetCommit(context.Background(), data.Repository.Owner, data.Repository.Name, data.SHA)
-		if err != nil {
-			panic(err)
-		}
-		data.Commit = commit
+	if cmt := data.Commit.Get(); cmt != nil {
+		return cmt
 	}
-	return data.Commit
+	commit, _, err := data.GitHub.Git.GetCommit(context.Background(), data.Repository.Owner, data.Repository.Name, data.SHA)
+	if err != nil {
+		panic(err)
+	}
+	data.Commit.Set(commit)
+	return commit
 }
 
 func (data *Data) GetPRNumber() int {
-	if data.PullRequest.Number == 0 {
-		if data.PullRequest.PullRequest != nil {
-			data.PullRequest.Number = data.PullRequest.PullRequest.GetNumber()
-			return data.PullRequest.Number
-		}
-		n, err := getPRNumber(context.Background(), data.Repository.Owner, data.Repository.Name, data.SHA, data.GitHub)
-		if err != nil {
-			panic(err)
-		}
-		data.PullRequest.Number = n
+	if number := data.PullRequest.Number.Get(); number != 0 {
+		return number
 	}
-	return data.PullRequest.Number
+
+	if pr := data.PullRequest.PullRequest.Get(); pr != nil {
+		number := pr.GetNumber()
+		data.PullRequest.Number.Set(number)
+		return number
+	}
+
+	n, err := getPRNumber(context.Background(), data.Repository.Owner, data.Repository.Name, data.SHA, data.GitHub)
+	if err != nil {
+		panic(err)
+	}
+	data.PullRequest.Number.Set(n)
+	return n
 }
 
 func (data *Data) GetPR() *github.PullRequest {
-	if data.PullRequest.PullRequest == nil {
-		pr, _, err := data.GitHub.PullRequests.Get(context.Background(), data.Repository.Owner, data.Repository.Name, data.GetPRNumber())
+	pr := data.PullRequest.PullRequest.Get()
+	if pr == nil {
+		p, _, err := data.GitHub.PullRequests.Get(context.Background(), data.Repository.Owner, data.Repository.Name, data.GetPRNumber())
 		if err != nil {
 			panic(err)
 		}
-		data.PullRequest.PullRequest = pr
+		pr = p
+		data.PullRequest.PullRequest.Set(pr)
 	}
-	return data.PullRequest.PullRequest
+	return pr
 }
 
 func (data *Data) GetPRFiles() []*github.CommitFile {
-	if data.PullRequest.Files == nil {
-		files, _, err := getPRFiles(context.Background(), data.GitHub, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.GetPR().GetChangedFiles())
-		if err != nil {
-			panic(err)
-		}
-		data.PullRequest.Files = files
+	if files := data.PullRequest.Files.Get(); files != nil {
+		return files
 	}
-	return data.PullRequest.Files
+	files, _, err := getPRFiles(context.Background(), data.GitHub, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.GetPR().GetChangedFiles())
+	if err != nil {
+		panic(err)
+	}
+	data.PullRequest.Files.Set(files)
+	return files
 }

@@ -21,8 +21,8 @@ func Test_handleMatrix(t *testing.T) {
 			title: "normal",
 			data: domain.Data{
 				PullRequest: domain.PullRequest{
-					ChangedFileNames: []string{"modules/README.md"},
-					LabelNames:       []string{},
+					ChangedFileNames: domain.NewStringListMutex("modules/README.md"),
+					LabelNames:       domain.NewStringListMutex(""),
 				},
 				Event: domain.Event{
 					Headers: domain.Headers{

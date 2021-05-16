@@ -40,10 +40,9 @@ func (handler *Handler) Do(ctx context.Context, event domain.Event) error {
 	}
 	event.Payload = body
 
-	data := &domain.Data{
-		Event:  event,
-		GitHub: handler.GitHub,
-	}
+	data := domain.NewData()
+	data.Event = event
+	data.GitHub = handler.GitHub
 
 	if event.Headers.Event != "push" && event.Headers.Event != "pull_request" {
 		// Events other than "push" and "pull_request" aren't supported.
@@ -59,7 +58,7 @@ func (handler *Handler) Do(ctx context.Context, event domain.Event) error {
 			FullName: repo.GetFullName(),
 			Name:     repo.GetName(),
 		}
-		data.HeadCommitMessage = pushEvent.GetHeadCommit().GetMessage()
+		data.HeadCommitMessage.Set(pushEvent.GetHeadCommit().GetMessage())
 		data.SHA = pushEvent.GetAfter()
 		data.Ref = pushEvent.GetRef()
 	case "pull_request":
@@ -73,10 +72,10 @@ func (handler *Handler) Do(ctx context.Context, event domain.Event) error {
 		}
 		data.SHA = prEvent.GetAfter()
 		data.Ref = pr.GetHead().GetRef()
-		data.PullRequest.PullRequest = pr
+		data.PullRequest.PullRequest.Set(pr)
 	}
 	data.Repository.Owner = strings.Split(data.Repository.FullName, "/")[0]
-	if err := handler.handleEvent(ctx, data); err != nil {
+	if err := handler.handleEvent(ctx, &data); err != nil {
 		handler.sendErrorNotificaiton(ctx, err, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.SHA)
 		return err
 	}

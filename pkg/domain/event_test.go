@@ -16,7 +16,7 @@ func TestData_CommitMessage(t *testing.T) {
 		{
 			title: "normal",
 			data: domain.Data{
-				HeadCommitMessage: "hello",
+				HeadCommitMessage: domain.NewStringMutex("hello"),
 			},
 			exp: "hello",
 		},

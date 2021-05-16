@@ -18,11 +18,21 @@ type Headers struct {
 }
 
 type PullRequest struct {
-	ChangedFileNames []string
-	LabelNames       []string
-	PullRequest      *github.PullRequest
-	Files            []*github.CommitFile
-	Number           int
+	ChangedFileNames StringListMutex
+	LabelNames       StringListMutex
+	PullRequest      PRMutex
+	Files            CommitFilesMutex
+	Number           IntMutex
+}
+
+func NewPullRequest() PullRequest {
+	return PullRequest{
+		ChangedFileNames: NewStringListMutex(),
+		LabelNames:       NewStringListMutex(),
+		PullRequest:      NewPRMutex(),
+		Files:            NewCommitFilesMutex(),
+		Number:           NewIntMutex(),
+	}
 }
 
 type Repository struct {
@@ -37,11 +47,19 @@ type Data struct {
 	Event             Event
 	PullRequest       PullRequest
 	Repository        Repository
-	HeadCommitMessage string
+	HeadCommitMessage StringMutex
 	SHA               string
 	Ref               string
 	GitHub            *github.Client
-	Commit            *github.Commit
+	Commit            CommitMutex
+}
+
+func NewData() Data {
+	return Data{
+		Commit:            NewCommitMutex(),
+		HeadCommitMessage: NewStringMutex(""),
+		PullRequest:       NewPullRequest(),
+	}
 }
 
 func (data *Data) Convert() map[string]interface{} {
@@ -61,22 +79,28 @@ func (data *Data) Convert() map[string]interface{} {
 }
 
 func (data *Data) CommitMessage() string {
-	if data.HeadCommitMessage == "" {
-		data.HeadCommitMessage = data.GetCommit().GetMessage()
+	if msg := data.HeadCommitMessage.Get(); msg != "" {
+		return msg
 	}
-	return data.HeadCommitMessage
+	msg := data.GetCommit().GetMessage()
+	data.HeadCommitMessage.Set(msg)
+	return msg
 }
 
 func (data *Data) GetPRFileNames() []string {
-	if data.PullRequest.ChangedFileNames == nil {
-		data.PullRequest.ChangedFileNames = extractPRFileNames(data.GetPRFiles())
+	if val := data.PullRequest.ChangedFileNames.Get(); val != nil {
+		return val
 	}
-	return data.PullRequest.ChangedFileNames
+	val := extractPRFileNames(data.GetPRFiles())
+	data.PullRequest.ChangedFileNames.Set(val)
+	return val
 }
 
 func (data *Data) GetPRLabelNames() []string {
-	if data.PullRequest.LabelNames == nil {
-		data.PullRequest.LabelNames = extractLabelNames(data.GetPR().Labels)
+	if val := data.PullRequest.LabelNames.Get(); val != nil {
+		return val
 	}
-	return data.PullRequest.LabelNames
+	val := extractLabelNames(data.GetPR().Labels)
+	data.PullRequest.LabelNames.Set(val)
+	return val
 }
