@@ -19,6 +19,7 @@ Extend AWS CodeBuild with Lambda.
   * [Sample Terraform Configuration](terraform)
 * [Expression](docs/expression.md)
 * [Error Notification](docs/error-notification.md)
+* [Practice](docs/practice.md)
 
 ## Feature
 
