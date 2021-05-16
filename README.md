@@ -7,7 +7,7 @@
 
 _Lambda => CodeBuild = lambuild_
 
-Trigger AWS CodeBuild's build with dynamic configuration based on the content of event and associated pull request with GitHub Webhook and Lambda Function.
+Extend AWS CodeBuild with Lambda.
 
 ## Link
 
@@ -20,12 +20,105 @@ Trigger AWS CodeBuild's build with dynamic configuration based on the content of
 * [Expression](docs/expression.md)
 * [Error Notification](docs/error-notification.md)
 
-## Motivation
+## Feature
 
-When we use CodeBuild's Batch Build, we want to change the build configuration base on the content of event and associated pull request.
-This is especially important for _Monorepo_.
-For example, we want to run the build `test_foo` only when the service `foo` is updated in the associated pull request.
-But CodeBuild doesn't support such a feature, so we develop `lambuild`.
+### Run Batch Build's each build conditionally.
+
+e.g.
+
+```yaml
+version: 0.2
+batch:
+  build-list:
+    - identifier: foo
+      buildspec: foo/buildspec.yaml
+      if: 'any(getPRFileNames(), {# startsWith "foo/"})'
+    - identifier: renovate
+      buildspec: buildspec/renovate.yaml
+      if: 'any(getPRFileNames(), {# == "renovate.json"})'
+```
+
+### Support multiple buildspec files
+
+[GitHub Actions](https://docs.github.com/en/actions) supports multiple workflow files on `.github/workflows` directory.
+Like GitHub Actions, `lambuild` supports multiple buildspec files.
+
+### Run builds conditionally.
+
+e.g.
+
+```yaml
+version: 0.2
+lambuild:
+  if: 'event.Headers.Event == "pull_request"'
+  build-status-context: "foo ({{.event.Headers.Event}})"
+phases:
+  build:
+    commands:
+      - "echo foo"
+```
+
+### Support to define custom Environment Variables with GitHub Webhook Event and associated Pull Request
+
+e.g.
+
+```yaml
+version: 0.2
+lambuild:
+  env:
+    variables:
+      LAMBUILD_WEBHOOK_BODY: "event.Body"
+      LAMBUILD_WEBHOOK_EVENT: "event.Headers.Event"
+      LAMBUILD_WEBHOOK_DELIVERY: "event.Headers.Delivery"
+      LAMBUILD_HEAD_COMMIT_MSG: "getCommitMessage()"
+phases:
+  build:
+    commands:
+      - 'echo $LAMBUILD_HEAD_COMMIT_MSG'
+```
+
+### Override Build Configuration like `image` in buildspec
+
+e.g.
+
+```yaml
+version: 0.2
+lambuild:
+  build-status-context: "foo ({{.event.Headers.Event}})"
+  image: aws/codebuild/standard:5.0
+  compute-type: BUILD_GENERAL1_SMALL
+phases:
+  build:
+    commands:
+      - "echo foo"
+```
+
+### Run multiple builds based on the same buildspec without Batch Build
+
+e.g.
+
+```yaml
+version: 0.2
+lambuild:
+  env:
+    variables:
+      NAME: "item.name"
+  items:
+  - image: aws/codebuild/standard:5.0
+    param:
+      name: foo
+  - param:
+      name: bar
+phases:
+  build:
+    commands:
+      - "echo NAME: $NAME"
+```
+
+Maybe you prefer this feature rather than Batch Build, because
+
+* It takes time to run Batch Build
+* Batch Build is a little inconvenient
 
 ## Architecture
 

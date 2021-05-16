@@ -77,8 +77,13 @@ If an event doesn't match any hook's condition, the event is ignored.
 
 path | type | required | default | description
 --- | --- | --- | --- | ---
-.config | string | false | `lambuild.yaml` | relative path from repository's root directory to the buildspec template file on the source repository
+.config | string | false | `lambuild.yaml` | relative path from repository's root directory to the buildspec template file or directory on the source repository. 
 .if | string expression | false | "true" | the evaluated result must be a boolean. if an event doesn't match the condition, the event is ignored. If this field is empty, no event is ignored
+
+### hook.config
+
+If `.config` is a directory, files on the directory are treated as configuration files and procceeded in parallel, which means builds are run in parallel.
+The file extensiono of configuration file must be `.yml` or `.yaml`, otherwise the file is ignored.
 
 ## type: template string
 
