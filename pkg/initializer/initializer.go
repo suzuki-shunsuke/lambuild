@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/sirupsen/logrus"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	gh "github.com/suzuki-shunsuke/lambuild/pkg/github"
@@ -80,6 +81,15 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 	ghClient := gh.New(ctx, handler.Secret.GitHubToken)
 	handler.GitHub = &ghClient
 	handler.CodeBuild = codebuild.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
+
+	// get AWS Account ID
+	stsSvc := sts.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
+	stsOutput, err := stsSvc.GetCallerIdentityWithContext(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("get a caller identity: %w", err)
+	}
+	handler.AWSAccountID = aws.StringValue(stsOutput.Account)
+
 	return nil
 }
 

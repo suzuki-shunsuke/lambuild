@@ -17,10 +17,11 @@ import (
 )
 
 type Handler struct {
-	Config    config.Config
-	Secret    Secret
-	GitHub    domain.GitHub
-	CodeBuild CodeBuild
+	Config       config.Config
+	Secret       Secret
+	GitHub       domain.GitHub
+	CodeBuild    CodeBuild
+	AWSAccountID string
 }
 
 type CodeBuild interface {
@@ -49,6 +50,8 @@ func (handler *Handler) Do(ctx context.Context, event domain.Event) error {
 	data := domain.NewData()
 	data.Event = event
 	data.GitHub = handler.GitHub
+	data.AWS.Region = handler.Config.Region
+	data.AWS.AccountID = handler.AWSAccountID
 
 	if event.Headers.Event != "push" && event.Headers.Event != "pull_request" {
 		// Events other than "push" and "pull_request" aren't supported.

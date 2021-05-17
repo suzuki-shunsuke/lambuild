@@ -55,6 +55,12 @@ type Data struct {
 	Ref               string
 	GitHub            GitHub
 	Commit            mutex.Commit
+	AWS               AWSData
+}
+
+type AWSData struct {
+	Region    string
+	AccountID string
 }
 
 type GitHub interface {
@@ -88,6 +94,10 @@ func (data *Data) Convert() map[string]interface{} {
 		"getPRFiles":       data.GetPRFiles,
 		"getPRFileNames":   data.GetPRFileNames,
 		"getPRLabelNames":  data.GetPRLabelNames,
+		"aws": map[string]interface{}{
+			"region":     data.AWS.Region,
+			"account_id": data.AWS.AccountID,
+		},
 	})
 }
 
