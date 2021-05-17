@@ -59,8 +59,9 @@ type Data struct {
 }
 
 type AWSData struct {
-	Region    string
-	AccountID string
+	Region               string
+	AccountID            string
+	CodeBuildProjectName string
 }
 
 type GitHub interface {
@@ -95,8 +96,11 @@ func (data *Data) Convert() map[string]interface{} {
 		"getPRFileNames":   data.GetPRFileNames,
 		"getPRLabelNames":  data.GetPRLabelNames,
 		"aws": map[string]interface{}{
-			"region":     data.AWS.Region,
-			"account_id": data.AWS.AccountID,
+			"Region":    data.AWS.Region,
+			"AccountID": data.AWS.AccountID,
+			"Codebuild": map[string]interface{}{
+				"ProjectName": data.AWS.CodeBuildProjectName,
+			},
 		},
 	})
 }

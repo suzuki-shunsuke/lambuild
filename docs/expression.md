@@ -10,8 +10,9 @@ The following parameters are passed to expressions.
 .repo | [Repository](#type-repository) | |
 .sha | string | |
 .ref | string | |
-.aws.region | string | `us-east-1` |
-.aws.account_id | string | |
+.aws.Region | string | `us-east-1` |
+.aws.AccountID | string | |
+.aws.CodeBuild.ProjectName | string | |
 .getCommit | `func() *github.Commit` | |
 .getCommitMessage | `func() string` | |
 .getPR | `func() *github.PullRequest` | | get an associated pull request

@@ -105,6 +105,8 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 		return nil
 	}
 
+	data.AWS.CodeBuildProjectName = repo.CodeBuild.ProjectName
+
 	hook, f, err := getHook(data, repo)
 	if err != nil {
 		return err
