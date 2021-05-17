@@ -104,3 +104,31 @@ phases:
         if: |
           ref == "refs/heads/main" # main branch
 ```
+
+## Run multiple builds with items
+
+e.g.
+
+```yaml
+version: 0.2
+env:
+  git-credential-helper: yes
+lambuild:
+  build-status-context: "{{.item.name}} ({{.event.Headers.Event}})"
+  items:
+    - param:
+        name: foo
+    - param:
+        name: bar
+  env:
+    variables:
+      NAME: "{{.item.name}}"
+phases:
+  build:
+    commands:
+      - echo "NAME: $NAME"
+```
+
+When `.lambuild.items` is specified, a build is run per the element of `.lambuild.items`.
+In case of the above example, two builds (`foo` and `bar`) are run.
+And `param` field is passed to the expression and template as the variable `item`.

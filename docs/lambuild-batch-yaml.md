@@ -1,5 +1,17 @@
 # lambuild.yaml for Batch Build
 
+## Note
+
+Batch Build supports to specify `buildspec` as the following.
+
+```yaml
+  build-list:
+    - identifier: foo
+      buildspec: foo/buildspec.yaml
+```
+
+But `lambuild` doesn't check this file, so in this file `lambuild` specific configuration can't be used. 
+
 ## Example
 
 build-list
