@@ -11,7 +11,7 @@ import (
 type Buildspec struct {
 	Batch    Batch                  `yaml:",omitempty"`
 	Lambuild Lambuild               `yaml:",omitempty"`
-	Map      map[string]interface{} `yaml:"-"`
+	Map      map[string]interface{} `yaml:",inline,omitempty"`
 	Phases   Phases
 }
 
@@ -43,18 +43,6 @@ func (buildspec *Buildspec) ToYAML(param interface{}) ([]byte, error) {
 		return nil, fmt.Errorf("marshal a buildspec: %w", err)
 	}
 	return builtContent, nil
-}
-
-func (buildspec *Buildspec) MarshalYAML() (interface{}, error) {
-	m := make(map[string]interface{}, len(buildspec.Map))
-	for k, v := range buildspec.Map {
-		if k == "lambuild" {
-			continue
-		}
-		m[k] = v
-	}
-	m["batch"] = buildspec.Batch
-	return m, nil
 }
 
 type Lambuild struct {

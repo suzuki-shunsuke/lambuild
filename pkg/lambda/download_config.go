@@ -59,16 +59,10 @@ func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entr
 			content = cnt
 		}
 
-		m := map[string]interface{}{}
-		if err := yaml.Unmarshal([]byte(content), &m); err != nil {
-			return nil, fmt.Errorf("unmarshal a buildspec to map: %w", err)
-		}
-
 		buildspec := bspec.Buildspec{}
 		if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
 			return nil, fmt.Errorf("unmarshal a buildspec: %w", err)
 		}
-		buildspec.Map = m
 		specs[i] = buildspec
 	}
 	return specs, nil
