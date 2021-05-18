@@ -7,7 +7,17 @@
 
 _Lambda => CodeBuild = lambuild_
 
-Extend AWS CodeBuild with Lambda.
+Extend AWS CodeBuild with [GitHub Webhook](https://docs.github.com/en/developers/webhooks-and-events/webhooks), [Amazon API Gateway](https://aws.amazon.com/api-gateway/), and [AWS Lambda](https://aws.amazon.com/lambda/).
+
+`lambuild` provides CodeBuild users with powerful features.
+
+* [Multiple buildspec files](#multiple-buildspec-files)
+* [Conditional builds](#conditional-builds)
+* [Custom Environment Variables with GitHub Webhook Event and associated Pull Request](#custom-environment-variables-with-gitHub-webhook-event-and-associated-pull-request)
+* [Override Build Configuration like `image` in buildspec](#override-build-configuration-like-image-in-buildspec)
+* [Run multiple builds based on the same buildspec without Batch Build](#run-multiple-builds-based-on-the-same-buildspec-without-batch-build)
+* [Run Batch Build's each build conditionally](#run-batch-builds-each-build-conditionally)
+* etc
 
 ## Link
 
@@ -23,28 +33,12 @@ Extend AWS CodeBuild with Lambda.
 
 ## Feature
 
-### Run Batch Build's each build conditionally.
-
-e.g.
-
-```yaml
-version: 0.2
-batch:
-  build-list:
-    - identifier: foo
-      buildspec: foo/buildspec.yaml
-      if: 'any(getPRFileNames(), {# startsWith "foo/"})'
-    - identifier: renovate
-      buildspec: buildspec/renovate.yaml
-      if: 'any(getPRFileNames(), {# == "renovate.json"})'
-```
-
-### Support multiple buildspec files
+### Multiple buildspec files
 
 [GitHub Actions](https://docs.github.com/en/actions) supports multiple workflow files on `.github/workflows` directory.
 Like GitHub Actions, `lambuild` supports multiple buildspec files.
 
-### Run builds conditionally.
+### Conditional builds
 
 e.g.
 
@@ -59,7 +53,7 @@ phases:
       - "echo foo"
 ```
 
-### Support to define custom Environment Variables with GitHub Webhook Event and associated Pull Request
+### Custom Environment Variables with GitHub Webhook Event and associated Pull Request
 
 e.g.
 
@@ -120,6 +114,22 @@ Maybe you prefer this feature rather than Batch Build, because
 
 * It takes time to run Batch Build
 * Batch Build is a little inconvenient
+
+### Run Batch Build's each build conditionally
+
+e.g.
+
+```yaml
+version: 0.2
+batch:
+  build-list:
+    - identifier: foo
+      buildspec: foo/buildspec.yaml
+      if: 'any(getPRFileNames(), {# startsWith "foo/"})'
+    - identifier: renovate
+      buildspec: buildspec/renovate.yaml
+      if: 'any(getPRFileNames(), {# == "renovate.json"})'
+```
 
 ## Architecture
 
