@@ -74,7 +74,9 @@ func handleBuildItem(data *domain.Data, buildspec bspec.Buildspec, item bspec.It
 			Value: aws.String(v),
 		})
 	}
-	build.EnvironmentVariablesOverride = envs
+	if len(envs) != 0 {
+		build.EnvironmentVariablesOverride = envs
+	}
 
 	if !item.BuildStatusContext.Empty() {
 		s, err := item.BuildStatusContext.Execute(param)
