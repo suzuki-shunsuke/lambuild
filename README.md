@@ -7,9 +7,9 @@
 
 _Lambda => CodeBuild = lambuild_
 
-Extend AWS CodeBuild with [GitHub Webhook](https://docs.github.com/en/developers/webhooks-and-events/webhooks), [Amazon API Gateway](https://aws.amazon.com/api-gateway/), and [AWS Lambda](https://aws.amazon.com/lambda/).
-
-`lambuild` provides CodeBuild users with powerful features.
+`lambuild` empowers [AWS CodeBuild](https://aws.amazon.com/codebuild/) whose source provider is `GITHUB`.
+Instead of [AWS CodeBuild's GitHub webhook events support](https://docs.aws.amazon.com/codebuild/latest/userguide/github-webhook.html),
+`lambuild` triggers build with [GitHub Webhook](https://docs.github.com/en/developers/webhooks-and-events/webhooks), [Amazon API Gateway](https://aws.amazon.com/api-gateway/), and [AWS Lambda](https://aws.amazon.com/lambda/) to provide the following powerful features.
 
 * [Multiple buildspec files](#multiple-buildspec-files)
 * [Conditional builds](#conditional-builds)
