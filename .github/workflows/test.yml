@@ -20,7 +20,7 @@ jobs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v2
       with:
-        version: v1.39
+        version: v1.40
 
     - name: remove changes
       # Sometimes it is failed to release by goreleaser due to changes of go.sum

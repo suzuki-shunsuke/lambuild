@@ -1,10 +1,8 @@
 package lambda
 
 import (
-	"bytes"
 	"context"
 
-	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,22 +19,20 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 	})
 
 	// generate a comment
-	buf := &bytes.Buffer{}
 	var cmt string
-	if renderErr := handler.Config.ErrorNotificationTemplate.Execute(buf, map[string]interface{}{
+	s, renderErr := handler.Config.ErrorNotificationTemplate.Execute(map[string]interface{}{
 		"Error": e,
-	}); renderErr != nil {
+	})
+	if renderErr != nil {
 		logE.WithError(renderErr).Error("render a comment to send it to the pull request")
 		cmt = "lambuild failed to procceed the request: " + e.Error()
 	} else {
-		cmt = buf.String()
+		cmt = s
 	}
 
 	if prNumber == 0 {
 		// send a comment to commit
-		if _, _, cmtErr := handler.GitHub.Repositories.CreateComment(ctx, repoOwner, repoName, sha, &github.RepositoryComment{
-			Body: github.String(cmt),
-		}); cmtErr != nil {
+		if cmtErr := handler.GitHub.CreateCommitComment(ctx, repoOwner, repoName, sha, cmt); cmtErr != nil {
 			logE.WithError(cmtErr).Error("send a comment to the commit")
 		}
 		logE.Info("send a comment to the commit")
@@ -44,9 +40,7 @@ func (handler *Handler) sendErrorNotificaiton(ctx context.Context, e error, repo
 	}
 
 	// send a comment to pull request
-	if _, _, cmtErr := handler.GitHub.Issues.CreateComment(ctx, repoOwner, repoName, prNumber, &github.IssueComment{
-		Body: github.String(cmt),
-	}); cmtErr != nil {
+	if cmtErr := handler.GitHub.CreatePRComment(ctx, repoOwner, repoName, prNumber, cmt); cmtErr != nil {
 		logE.WithError(cmtErr).Error("send a comment to the pull request")
 	}
 	logE.Info("send a comment to the pull request")

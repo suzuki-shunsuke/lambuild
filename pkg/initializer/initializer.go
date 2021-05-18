@@ -10,12 +10,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/google/go-github/v35/github"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/sirupsen/logrus"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
+	gh "github.com/suzuki-shunsuke/lambuild/pkg/github"
 	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
-	templ "github.com/suzuki-shunsuke/lambuild/pkg/template"
-	"golang.org/x/oauth2"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 	"gopkg.in/yaml.v2"
 )
 
@@ -25,8 +25,8 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 		return fmt.Errorf("read configuration from source: %w", err)
 	}
 
-	if cfg.LogLevel != 0 {
-		logrus.SetLevel(cfg.LogLevel)
+	if lvl := cfg.LogLevel.Get(); lvl != 0 {
+		logrus.SetLevel(lvl)
 	}
 
 	if err := validateRepositories(cfg.Repositories); err != nil {
@@ -54,9 +54,9 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 		}
 	}
 
-	if cfg.BuildStatusContext == nil {
+	if cfg.BuildStatusContext.Empty() {
 		if cntxt := os.Getenv("BUILD_STATUS_CONTEXT"); cntxt != "" {
-			tpl, err := templ.Compile(cntxt)
+			tpl, err := template.New(cntxt)
 			if err != nil {
 				return fmt.Errorf("parse BUILD_STATUS_CONTEXT as template (%s): %w", cntxt, err)
 			}
@@ -78,10 +78,18 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 	}
 	handler.Secret = secret
 
-	handler.GitHub = github.NewClient(oauth2.NewClient(ctx, oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: handler.Secret.GitHubToken},
-	)))
+	ghClient := gh.New(ctx, handler.Secret.GitHubToken)
+	handler.GitHub = &ghClient
 	handler.CodeBuild = codebuild.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
+
+	// get AWS Account ID
+	stsSvc := sts.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
+	stsOutput, err := stsSvc.GetCallerIdentityWithContext(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("get a caller identity: %w", err)
+	}
+	handler.AWSAccountID = aws.StringValue(stsOutput.Account)
+
 	return nil
 }
 
@@ -129,18 +137,18 @@ Please check.
 ` + "```"
 
 func setErrorNotificationTemplate(cfg *config.Config) error {
-	if cfg.ErrorNotificationTemplate != nil {
+	if !cfg.ErrorNotificationTemplate.Empty() {
 		return nil
 	}
 	if errTpl := os.Getenv("ERROR_NOTIFICATION_TEMPLATE"); errTpl != "" {
-		tpl, err := templ.Compile(errTpl)
+		tpl, err := template.New(errTpl)
 		if err != nil {
 			return fmt.Errorf("parse ERROR_NOTIFICATION_TEMPLATE as template: %w", err)
 		}
 		cfg.ErrorNotificationTemplate = tpl
 		return nil
 	}
-	tpl, err := templ.Compile(defaultErrorNotificationTemplate)
+	tpl, err := template.New(defaultErrorNotificationTemplate)
 	if err != nil {
 		return fmt.Errorf("parse defaultErroNotificationTemplate as template: %w", err)
 	}

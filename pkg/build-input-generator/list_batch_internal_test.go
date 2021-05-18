@@ -8,19 +8,19 @@ import (
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 	"gopkg.in/yaml.v2"
 )
 
 func Test_setListBuildInput(t *testing.T) {
 	t.Parallel()
 	data := []struct {
-		title     string
-		input     codebuild.StartBuildInput
-		buildspec bspec.Buildspec
-		data      domain.Data
-		elem      bspec.ListElement
-		isErr     bool
-		exp       codebuild.StartBuildInput
+		title string
+		input codebuild.StartBuildInput
+		data  domain.Data
+		elem  bspec.ListElement
+		isErr bool
+		exp   codebuild.StartBuildInput
 	}{
 		{
 			title: "minimum",
@@ -59,7 +59,7 @@ func Test_setListBuildInput(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			err := setListBuildInput(&d.input, nil, &d.data, d.elem)
+			err := setListBuildInput(&d.input, template.Template{}, &d.data, bspec.Lambuild{}, d.elem)
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")
@@ -160,13 +160,11 @@ variables:
 				t.Fatal(err)
 			}
 
-			data := domain.Data{
-				Lambuild: bspec.Lambuild{
-					Env: env,
-				},
-			}
+			data := domain.Data{}
 
-			envs, err := getLambuildEnvVars(&data)
+			envs, err := getLambuildEnvVars(&data, bspec.Lambuild{
+				Env: env,
+			})
 			if d.isErr {
 				if err == nil {
 					t.Fatal("err must be returned")

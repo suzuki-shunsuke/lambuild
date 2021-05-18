@@ -6,6 +6,7 @@ linters:
   # WARN [runner] The linter 'interfacer' is deprecated (since v1.38.0) due to: The repository of the linter has been archived by the owner.  
   # WARN [runner] The linter 'maligned' is deprecated (since v1.38.0) due to: The repository of the linter has been archived by the owner.  Replaced by govet 'fieldalignment'. 
   - scopelint
+  - tagliatelle
   - interfacer
   - maligned
   - wsl

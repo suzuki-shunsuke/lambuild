@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/mutex"
 )
 
 func TestData_CommitMessage(t *testing.T) {
@@ -16,7 +17,7 @@ func TestData_CommitMessage(t *testing.T) {
 		{
 			title: "normal",
 			data: domain.Data{
-				HeadCommitMessage: "hello",
+				HeadCommitMessage: mutex.NewString("hello"),
 			},
 			exp: "hello",
 		},

@@ -1,26 +1,31 @@
 package generator
 
 import (
-	"text/template"
+	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
-func GenerateInput(logE *logrus.Entry, buildStatusContext *template.Template, data *domain.Data, buildspec bspec.Buildspec, repo config.Repository) (domain.BuildInput, error) {
+func GenerateInput(logE *logrus.Entry, buildStatusContext template.Template, data *domain.Data, buildspec bspec.Buildspec, repo config.Repository) (domain.BuildInput, error) {
 	buildInput := domain.BuildInput{
-		Build: &codebuild.StartBuildInput{
-			ProjectName:   aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion: aws.String(data.SHA),
-		},
-		BatchBuild: &codebuild.StartBuildBatchInput{
-			ProjectName:   aws.String(repo.CodeBuild.ProjectName),
-			SourceVersion: aws.String(data.SHA),
-		},
+		BatchBuild: &codebuild.StartBuildBatchInput{},
+	}
+
+	if !buildspec.Lambuild.If.Empty() {
+		f, err := buildspec.Lambuild.If.Run(data.Convert())
+		if err != nil {
+			return buildInput, fmt.Errorf("evaluate buildspec.Lambuild.If: %w", err)
+		}
+		if !f {
+			return domain.BuildInput{
+				Empty: true,
+			}, nil
+		}
 	}
 
 	if len(buildspec.Batch.BuildGraph) != 0 {
@@ -28,6 +33,7 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext *template.Template, da
 		if err := handleGraph(buildStatusContext, &buildInput, logE, data, buildspec); err != nil {
 			return buildInput, err
 		}
+		return buildInput, nil
 	}
 
 	if len(buildspec.Batch.BuildList) != 0 {
@@ -35,6 +41,7 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext *template.Template, da
 		if err := handleList(&buildInput, logE, buildStatusContext, data, buildspec); err != nil {
 			return buildInput, err
 		}
+		return buildInput, nil
 	}
 
 	if !buildspec.Batch.BuildMatrix.Empty() {
@@ -42,6 +49,8 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext *template.Template, da
 		if err := handleMatrix(&buildInput, logE, buildStatusContext, data, buildspec); err != nil {
 			return buildInput, err
 		}
+		return buildInput, nil
 	}
-	return buildInput, nil
+
+	return handleBuild(data, buildspec)
 }

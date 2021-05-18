@@ -1,16 +1,15 @@
 package generator
 
 import (
-	"bytes"
 	"fmt"
-	"text/template"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
-func setBuildStatusContext(contxt *template.Template, data *domain.Data, input *codebuild.StartBuildInput) error {
+func setBuildStatusContext(contxt template.Template, data *domain.Data, input *codebuild.StartBuildInput) error {
 	s, err := getBuildStatusContext(contxt, data)
 	if err != nil || s == "" {
 		return err
@@ -21,19 +20,16 @@ func setBuildStatusContext(contxt *template.Template, data *domain.Data, input *
 	return nil
 }
 
-func getBuildStatusContext(tpl *template.Template, data *domain.Data) (string, error) {
-	if tpl == nil {
-		return "", nil
-	}
-	buf := &bytes.Buffer{}
-	if err := tpl.Execute(buf, map[string]interface{}{
+func getBuildStatusContext(tpl template.Template, data *domain.Data) (string, error) {
+	s, err := tpl.Execute(map[string]interface{}{
 		"event": data.Event,
 		"pr":    data.PullRequest,
 		"repo":  data.Repository,
 		"sha":   data.SHA,
 		"ref":   data.Ref,
-	}); err != nil {
+	})
+	if err != nil {
 		return "", fmt.Errorf("render a build status context: %w", err)
 	}
-	return buf.String(), nil
+	return s, nil
 }

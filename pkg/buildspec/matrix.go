@@ -4,8 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
+	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
 )
 
 type Matrix struct {
@@ -27,7 +26,7 @@ type ExprList []interface{}
 
 type ExprElem struct {
 	Value string
-	If    *vm.Program
+	If    expr.Bool
 }
 
 func (list *ExprList) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -63,7 +62,7 @@ func (list *ExprList) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				if !ok {
 					return errors.New("if of buildspec must be string")
 				}
-				prog, err := expr.Compile(vs, expr.AsBool())
+				prog, err := expr.NewBool(vs)
 				if err != nil {
 					return fmt.Errorf("compile an expression: %s: %w", vs, err)
 				}

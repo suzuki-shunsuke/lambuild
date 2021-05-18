@@ -3,18 +3,20 @@ package buildspec
 import (
 	"fmt"
 
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
+	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
+	"gopkg.in/yaml.v2"
 )
 
 type Buildspec struct {
 	Batch    Batch                  `yaml:",omitempty"`
 	Lambuild Lambuild               `yaml:",omitempty"`
-	Map      map[string]interface{} `yaml:"-"`
+	Map      map[string]interface{} `yaml:",inline,omitempty"`
+	Phases   Phases
 }
 
-func (buildspec *Buildspec) MarshalYAML() (interface{}, error) {
-	m := make(map[string]interface{}, len(buildspec.Map))
+func (buildspec *Buildspec) filter(param interface{}) (map[string]interface{}, error) {
+	m := make(map[string]interface{}, len(buildspec.Map)+2) //nolint:gomnd
 	for k, v := range buildspec.Map {
 		if k == "lambuild" {
 			continue
@@ -22,11 +24,55 @@ func (buildspec *Buildspec) MarshalYAML() (interface{}, error) {
 		m[k] = v
 	}
 	m["batch"] = buildspec.Batch
+	phases, err := buildspec.Phases.Filter(param)
+	if err != nil {
+		return nil, err
+	}
+	m["phases"] = phases
 	return m, nil
 }
 
+func (buildspec *Buildspec) ToYAML(param interface{}) ([]byte, error) {
+	m, err := buildspec.filter(param)
+	if err != nil {
+		return nil, fmt.Errorf("filter commands from buildspec: %w", err)
+	}
+
+	builtContent, err := yaml.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal a buildspec: %w", err)
+	}
+	return builtContent, nil
+}
+
 type Lambuild struct {
-	Env LambuildEnv
+	Env                LambuildEnv
+	BuildStatusContext template.Template `yaml:"build-status-context"`
+	Image              string
+	ComputeType        string `yaml:"compute-type"`
+	EnvironmentType    string `yaml:"environment-type"`
+	DebugSession       *bool  `yaml:"debug-session"`
+	PrivilegedMode     *bool  `yaml:"privileged-mode"`
+	GitCloneDepth      *int64 `yaml:"git-clone-depth"`
+	ReportBuildStatus  *bool  `yaml:"report-build-status"`
+	// It is danger to allow to override Service Role
+	// So lambuild doesn't support to override Service Role
+	Items []Item
+	If    expr.Bool
+}
+
+type Item struct {
+	If                 expr.Bool
+	Env                LambuildEnv
+	BuildStatusContext template.Template `yaml:"build-status-context"`
+	Image              string
+	ComputeType        string `yaml:"compute-type"`
+	EnvironmentType    string `yaml:"environment-type"`
+	Param              map[string]interface{}
+}
+
+type LambuildEnv struct {
+	Variables map[string]expr.String
 }
 
 type Batch struct {
@@ -42,32 +88,8 @@ type Env struct {
 }
 
 type Phases struct {
-	Build Phase `yaml:",omitempty"`
-}
-
-type Phase struct {
-	Commands []string `yaml:",omiempty"`
-}
-
-type LambuildEnv struct {
-	Variables map[string]*vm.Program
-}
-
-func (env *LambuildEnv) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	a := struct {
-		Variables map[string]string
-	}{}
-	if err := unmarshal(&a); err != nil {
-		return err
-	}
-	vars := make(map[string]*vm.Program, len(a.Variables))
-	for k, v := range a.Variables {
-		prog, err := expr.Compile(v)
-		if err != nil {
-			return fmt.Errorf("compile an expression: %s: %w", v, err)
-		}
-		vars[k] = prog
-	}
-	env.Variables = vars
-	return nil
+	Install   Phase `yaml:",omitempty"`
+	PreBuild  Phase `yaml:"pre_build,omitempty"`
+	Build     Phase `yaml:",omitempty"`
+	PostBuild Phase `yaml:"post_build,omitempty"`
 }

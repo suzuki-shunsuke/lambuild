@@ -5,19 +5,28 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
 	generator "github.com/suzuki-shunsuke/lambuild/pkg/build-input-generator"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"golang.org/x/sync/errgroup"
 )
 
 type Handler struct {
-	Config    config.Config
-	Secret    Secret
-	GitHub    *github.Client
-	CodeBuild *codebuild.CodeBuild
+	Config       config.Config
+	Secret       Secret
+	GitHub       domain.GitHub
+	CodeBuild    CodeBuild
+	AWSAccountID string
+}
+
+type CodeBuild interface {
+	StartBuildBatchWithContext(ctx aws.Context, input *codebuild.StartBuildBatchInput, opts ...request.Option) (*codebuild.StartBuildBatchOutput, error)
+	StartBuildWithContext(ctx aws.Context, input *codebuild.StartBuildInput, opts ...request.Option) (*codebuild.StartBuildOutput, error)
 }
 
 type Secret struct {
@@ -38,10 +47,11 @@ func (handler *Handler) Do(ctx context.Context, event domain.Event) error {
 	}
 	event.Payload = body
 
-	data := &domain.Data{
-		Event:  event,
-		GitHub: handler.GitHub,
-	}
+	data := domain.NewData()
+	data.Event = event
+	data.GitHub = handler.GitHub
+	data.AWS.Region = handler.Config.Region
+	data.AWS.AccountID = handler.AWSAccountID
 
 	if event.Headers.Event != "push" && event.Headers.Event != "pull_request" {
 		// Events other than "push" and "pull_request" aren't supported.
@@ -57,7 +67,7 @@ func (handler *Handler) Do(ctx context.Context, event domain.Event) error {
 			FullName: repo.GetFullName(),
 			Name:     repo.GetName(),
 		}
-		data.HeadCommitMessage = pushEvent.GetHeadCommit().GetMessage()
+		data.HeadCommitMessage.Set(pushEvent.GetHeadCommit().GetMessage())
 		data.SHA = pushEvent.GetAfter()
 		data.Ref = pushEvent.GetRef()
 	case "pull_request":
@@ -71,10 +81,10 @@ func (handler *Handler) Do(ctx context.Context, event domain.Event) error {
 		}
 		data.SHA = prEvent.GetAfter()
 		data.Ref = pr.GetHead().GetRef()
-		data.PullRequest.PullRequest = pr
+		data.PullRequest.PullRequest.Set(pr)
 	}
 	data.Repository.Owner = strings.Split(data.Repository.FullName, "/")[0]
-	if err := handler.handleEvent(ctx, data); err != nil {
+	if err := handler.handleEvent(ctx, &data); err != nil {
 		handler.sendErrorNotificaiton(ctx, err, data.Repository.Owner, data.Repository.Name, data.GetPRNumber(), data.SHA)
 		return err
 	}
@@ -95,6 +105,8 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 		return nil
 	}
 
+	data.AWS.CodeBuildProjectName = repo.CodeBuild.ProjectName
+
 	hook, f, err := getHook(data, repo)
 	if err != nil {
 		return err
@@ -107,40 +119,57 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 		"config": hook.Config,
 	})
 
-	// get the configuration file from the target repository
-	buildspec, err := handler.getConfigFromRepo(ctx, logE, data, hook)
+	// get the configuration files from the target repository
+	buildspecs, err := handler.getConfigFromRepo(ctx, logE, data, hook)
 	if err != nil {
 		return err
 	}
-	logE.Debug("get a configuration file from the source repository")
-
-	buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
-	if err != nil {
-		return fmt.Errorf("generate a build input: %w", err)
-	}
-
-	if buildInput.Empty {
-		return nil
-	}
-
-	if buildInput.Batched {
-		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
-		if err != nil {
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.BuildBatch.Arn,
-		}).Info("start a batch build")
-		return nil
-	}
-
-	buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, buildInput.Build)
-	if err != nil {
-		return fmt.Errorf("start a batch build: %w", err)
-	}
 	logE.WithFields(logrus.Fields{
-		"build_arn": *buildOut.Build.Arn,
-	}).Info("start a build")
+		"number_of_buildspecs": len(buildspecs),
+	}).Debug("get configuration files from the source repository")
 
-	return nil
+	var eg errgroup.Group
+	for _, buildspec := range buildspecs {
+		buildspec := buildspec
+		eg.Go(func() error {
+			buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
+			if err != nil {
+				logE.WithError(err).Error("generate a build input")
+				return fmt.Errorf("generate a build input: %w", err)
+			}
+
+			if buildInput.Empty {
+				return nil
+			}
+
+			if buildInput.Batched {
+				buildInput.BatchBuild.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+				buildInput.BatchBuild.SourceVersion = aws.String(data.SHA)
+				buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
+				if err != nil {
+					logE.WithError(err).Error("start a batch build")
+					return fmt.Errorf("start a batch build: %w", err)
+				}
+				logE.WithFields(logrus.Fields{
+					"build_arn": *buildOut.BuildBatch.Arn,
+				}).Info("start a batch build")
+				return nil
+			}
+
+			for _, build := range buildInput.Builds {
+				build.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+				build.SourceVersion = aws.String(data.SHA)
+				buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, build)
+				if err != nil {
+					logE.WithError(err).Error("start a build")
+					return fmt.Errorf("start a build: %w", err)
+				}
+				logE.WithFields(logrus.Fields{
+					"build_arn": *buildOut.Build.Arn,
+				}).Info("start a build")
+			}
+			return nil
+		})
+	}
+	return eg.Wait() //nolint:wrapcheck
 }

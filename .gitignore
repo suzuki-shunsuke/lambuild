@@ -10,3 +10,4 @@ terraform.tfvars
 *.zip
 .terraform.lock.hcl
 .coverage
+.lambdaignore

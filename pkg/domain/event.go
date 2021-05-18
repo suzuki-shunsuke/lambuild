@@ -1,12 +1,10 @@
 package domain
 
 import (
-	"fmt"
+	"context"
 
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
 	"github.com/google/go-github/v35/github"
-	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
+	"github.com/suzuki-shunsuke/lambuild/pkg/mutex"
 )
 
 type Event struct {
@@ -23,11 +21,21 @@ type Headers struct {
 }
 
 type PullRequest struct {
-	ChangedFileNames []string
-	LabelNames       []string
-	PullRequest      *github.PullRequest
-	Files            []*github.CommitFile
-	Number           int
+	ChangedFileNames mutex.StringList
+	LabelNames       mutex.StringList
+	PullRequest      mutex.PR
+	Files            mutex.CommitFiles
+	Number           mutex.Int
+}
+
+func NewPullRequest() PullRequest {
+	return PullRequest{
+		ChangedFileNames: mutex.NewStringList(),
+		LabelNames:       mutex.NewStringList(),
+		PullRequest:      mutex.NewPR(),
+		Files:            mutex.NewCommitFiles(),
+		Number:           mutex.NewInt(),
+	}
 }
 
 type Repository struct {
@@ -42,16 +50,40 @@ type Data struct {
 	Event             Event
 	PullRequest       PullRequest
 	Repository        Repository
-	HeadCommitMessage string
+	HeadCommitMessage mutex.String
 	SHA               string
 	Ref               string
-	GitHub            *github.Client
-	Commit            *github.Commit
-	Lambuild          bspec.Lambuild
+	GitHub            GitHub
+	Commit            mutex.Commit
+	AWS               AWSData
 }
 
-func RunExpr(prog *vm.Program, data *Data) (interface{}, error) {
-	result, err := expr.Run(prog, setExprFuncs(map[string]interface{}{
+type AWSData struct {
+	Region               string
+	AccountID            string
+	CodeBuildProjectName string
+}
+
+type GitHub interface {
+	GetCommit(ctx context.Context, owner, repo, sha string) (*github.Commit, error)
+	GetPR(ctx context.Context, owner, repo string, number int) (*github.PullRequest, error)
+	GetPRFiles(ctx context.Context, owner, repo string, number int, opt *github.ListOptions) ([]*github.CommitFile, error)
+	GetPRsWithCommit(ctx context.Context, owner, repo string, sha string) ([]*github.PullRequest, error)
+	GetContents(ctx context.Context, owner, repo, path, ref string) (*github.RepositoryContent, []*github.RepositoryContent, error)
+	CreateCommitComment(ctx context.Context, owner, repo, sha, body string) error
+	CreatePRComment(ctx context.Context, owner, repo string, number int, body string) error
+}
+
+func NewData() Data {
+	return Data{
+		Commit:            mutex.NewCommit(),
+		HeadCommitMessage: mutex.NewString(""),
+		PullRequest:       NewPullRequest(),
+	}
+}
+
+func (data *Data) Convert() map[string]interface{} {
+	return setExprFuncs(map[string]interface{}{
 		"event":            data.Event,
 		"repo":             data.Repository,
 		"sha":              data.SHA,
@@ -63,30 +95,39 @@ func RunExpr(prog *vm.Program, data *Data) (interface{}, error) {
 		"getPRFiles":       data.GetPRFiles,
 		"getPRFileNames":   data.GetPRFileNames,
 		"getPRLabelNames":  data.GetPRLabelNames,
-	}))
-	if err != nil {
-		return nil, fmt.Errorf("evaluate a expr's compiled program: %w", err)
-	}
-	return result, nil
+		"aws": map[string]interface{}{
+			"Region":    data.AWS.Region,
+			"AccountID": data.AWS.AccountID,
+			"Codebuild": map[string]interface{}{
+				"ProjectName": data.AWS.CodeBuildProjectName,
+			},
+		},
+	})
 }
 
 func (data *Data) CommitMessage() string {
-	if data.HeadCommitMessage == "" {
-		data.HeadCommitMessage = data.GetCommit().GetMessage()
+	if msg := data.HeadCommitMessage.Get(); msg != "" {
+		return msg
 	}
-	return data.HeadCommitMessage
+	msg := data.GetCommit().GetMessage()
+	data.HeadCommitMessage.Set(msg)
+	return msg
 }
 
 func (data *Data) GetPRFileNames() []string {
-	if data.PullRequest.ChangedFileNames == nil {
-		data.PullRequest.ChangedFileNames = extractPRFileNames(data.GetPRFiles())
+	if val := data.PullRequest.ChangedFileNames.Get(); val != nil {
+		return val
 	}
-	return data.PullRequest.ChangedFileNames
+	val := extractPRFileNames(data.GetPRFiles())
+	data.PullRequest.ChangedFileNames.Set(val)
+	return val
 }
 
 func (data *Data) GetPRLabelNames() []string {
-	if data.PullRequest.LabelNames == nil {
-		data.PullRequest.LabelNames = extractLabelNames(data.GetPR().Labels)
+	if val := data.PullRequest.LabelNames.Get(); val != nil {
+		return val
 	}
-	return data.PullRequest.LabelNames
+	val := extractLabelNames(data.GetPR().Labels)
+	data.PullRequest.LabelNames.Set(val)
+	return val
 }

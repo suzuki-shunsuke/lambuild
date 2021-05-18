@@ -4,9 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/antonmedv/expr"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
+	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
+	"github.com/suzuki-shunsuke/lambuild/pkg/mutex"
 )
 
 func Test_handleMatrix(t *testing.T) {
@@ -21,8 +22,8 @@ func Test_handleMatrix(t *testing.T) {
 			title: "normal",
 			data: domain.Data{
 				PullRequest: domain.PullRequest{
-					ChangedFileNames: []string{"modules/README.md"},
-					LabelNames:       []string{},
+					ChangedFileNames: mutex.NewStringList("modules/README.md"),
+					LabelNames:       mutex.NewStringList(""),
 				},
 				Event: domain.Event{
 					Headers: domain.Headers{
@@ -42,16 +43,15 @@ func Test_handleMatrix(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			exp, err := expr.Compile(d.expression, expr.AsBool())
+			exp, err := expr.NewBool(d.expression)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			a, err := domain.RunExpr(exp, &d.data)
+			f, err := exp.Run(d.data.Convert())
 			if err != nil {
 				t.Fatal(err)
 			}
-			f := a.(bool) //nolint:forcetypeassert
 			if (f && !d.exp) || (!f && d.exp) {
 				t.Fatalf("wanted %v, got %v", d.exp, f)
 			}

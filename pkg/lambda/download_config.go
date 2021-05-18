@@ -3,6 +3,7 @@ package lambda
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
@@ -13,35 +14,56 @@ import (
 )
 
 // getConfigFromRepo gets the configuration file from the target repository
-func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entry, data *domain.Data, hook config.Hook) (bspec.Buildspec, error) {
-	buildspec := bspec.Buildspec{}
+func (handler *Handler) getConfigFromRepo(ctx context.Context, logE *logrus.Entry, data *domain.Data, hook config.Hook) ([]bspec.Buildspec, error) {
 	// get the configuration file from the target repository
 	if hook.Config == "" {
 		// set the default value
 		hook.Config = "lambuild.yaml"
 	}
-	file, _, _, err := handler.GitHub.Repositories.GetContents(ctx, data.Repository.Owner, data.Repository.Name, hook.Config, &github.RepositoryContentGetOptions{Ref: data.Ref})
+	file, files, err := handler.GitHub.GetContents(ctx, data.Repository.Owner, data.Repository.Name, hook.Config, data.Ref)
 	if err != nil {
 		logE.WithFields(logrus.Fields{
 			"path": hook.Config,
-		}).WithError(err).Error("")
-		return buildspec, fmt.Errorf("get a configuration file by GitHub API: %w", err)
+		}).WithError(err).Error("get configuration files by GitHub API")
+		return nil, fmt.Errorf("get configuration files by GitHub API: %w", err)
 	}
-	content, err := file.GetContent()
-	if err != nil {
-		return buildspec, fmt.Errorf("get a content: %w", err)
+	if file != nil {
+		files = []*github.RepositoryContent{file}
 	}
+	specs := make([]bspec.Buildspec, len(files))
+	for i, file := range files {
+		filePath := file.GetPath()
+		ext := filepath.Ext(filePath)
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+		content, err := file.GetContent()
+		if err != nil {
+			return nil, fmt.Errorf("get a content: %w", err)
+		}
+		if content == "" {
+			f, _, err := handler.GitHub.GetContents(ctx, data.Repository.Owner, data.Repository.Name, filePath, data.Ref)
+			if err != nil {
+				logE.WithFields(logrus.Fields{
+					"path": filePath,
+				}).WithError(err).Error("get a configuration file by GitHub API")
+				return nil, fmt.Errorf("get a configuration file by GitHub API: %w", err)
+			}
+			cnt, err := f.GetContent()
+			if err != nil {
+				return nil, fmt.Errorf("get a content: %w", err)
+			}
+			if cnt == "" {
+				return nil, fmt.Errorf("a content is empty (%s)", filePath)
+			}
+			content = cnt
+		}
 
-	m := map[string]interface{}{}
-	if err := yaml.Unmarshal([]byte(content), &m); err != nil {
-		return buildspec, fmt.Errorf("unmarshal a buildspec to map: %w", err)
+		buildspec := bspec.Buildspec{}
+		if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
+			return nil, fmt.Errorf("unmarshal a buildspec: %w", err)
+		}
+		specs[i] = buildspec
 	}
-
-	if err := yaml.Unmarshal([]byte(content), &buildspec); err != nil {
-		return buildspec, fmt.Errorf("unmarshal a buildspec: %w", err)
-	}
-	data.Lambuild = buildspec.Lambuild
-	buildspec.Lambuild = bspec.Lambuild{}
-	buildspec.Map = m
-	return buildspec, nil
+	return specs, nil
 }

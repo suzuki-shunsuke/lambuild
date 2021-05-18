@@ -10,6 +10,10 @@ import (
 
 func TestData_GetCommit(t *testing.T) {
 	t.Parallel()
+	d := domain.NewData()
+	d.Commit.Set(&github.Commit{
+		Message: github.String("hello"),
+	})
 	data := []struct {
 		title string
 		data  domain.Data
@@ -17,11 +21,7 @@ func TestData_GetCommit(t *testing.T) {
 	}{
 		{
 			title: "normal",
-			data: domain.Data{
-				Commit: &github.Commit{
-					Message: github.String("hello"),
-				},
-			},
+			data:  d,
 			exp: &github.Commit{
 				Message: github.String("hello"),
 			},
@@ -41,6 +41,8 @@ func TestData_GetCommit(t *testing.T) {
 
 func TestData_GetPRNumber(t *testing.T) {
 	t.Parallel()
+	domainData := domain.NewData()
+	domainData.PullRequest.Number.Set(5)
 	data := []struct {
 		title string
 		data  domain.Data
@@ -48,12 +50,8 @@ func TestData_GetPRNumber(t *testing.T) {
 	}{
 		{
 			title: "normal",
-			data: domain.Data{
-				PullRequest: domain.PullRequest{
-					Number: 5,
-				},
-			},
-			exp: 5,
+			data:  domainData,
+			exp:   5,
 		},
 	}
 	for _, d := range data {
@@ -70,6 +68,10 @@ func TestData_GetPRNumber(t *testing.T) {
 
 func TestData_GetPR(t *testing.T) {
 	t.Parallel()
+	domainData := domain.NewData()
+	domainData.PullRequest.PullRequest.Set(&github.PullRequest{
+		Number: github.Int(5),
+	})
 	data := []struct {
 		title string
 		data  domain.Data
@@ -77,13 +79,7 @@ func TestData_GetPR(t *testing.T) {
 	}{
 		{
 			title: "normal",
-			data: domain.Data{
-				PullRequest: domain.PullRequest{
-					PullRequest: &github.PullRequest{
-						Number: github.Int(5),
-					},
-				},
-			},
+			data:  domainData,
 			exp: &github.PullRequest{
 				Number: github.Int(5),
 			},
@@ -103,6 +99,12 @@ func TestData_GetPR(t *testing.T) {
 
 func TestData_GetPRFiles(t *testing.T) {
 	t.Parallel()
+	domainData := domain.NewData()
+	domainData.PullRequest.Files.Set([]*github.CommitFile{
+		{
+			Filename: github.String("foo"),
+		},
+	})
 	data := []struct {
 		title string
 		data  domain.Data
@@ -110,15 +112,7 @@ func TestData_GetPRFiles(t *testing.T) {
 	}{
 		{
 			title: "normal",
-			data: domain.Data{
-				PullRequest: domain.PullRequest{
-					Files: []*github.CommitFile{
-						{
-							Filename: github.String("foo"),
-						},
-					},
-				},
-			},
+			data:  domainData,
 			exp: []*github.CommitFile{
 				{
 					Filename: github.String("foo"),
