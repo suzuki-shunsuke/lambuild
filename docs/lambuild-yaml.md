@@ -132,3 +132,7 @@ phases:
 When `.lambuild.items` is specified, a build is run per the element of `.lambuild.items`.
 In case of the above example, two builds (`foo` and `bar`) are run.
 And `param` field is passed to the expression and template as the variable `item`.
+
+## Environment Variables
+
+Please see [Custom Environment Variables](environment-variables.md).
