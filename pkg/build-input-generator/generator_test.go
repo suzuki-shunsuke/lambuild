@@ -27,12 +27,6 @@ func newBool(s string) expr.Bool {
 	return b
 }
 
-func newTemplate(s string) template.Template {
-	b, err := template.New(s)
-	panicErr(err)
-	return b
-}
-
 func TestGenerateInput(t *testing.T) {
 	t.Parallel()
 	data := []struct {

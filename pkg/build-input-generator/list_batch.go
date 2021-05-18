@@ -53,38 +53,7 @@ func handleList(buildInput *domain.BuildInput, logE *logrus.Entry, buildStatusCo
 	return nil
 }
 
-func getLambuildEnvVars(data *domain.Data, lambuild bspec.Lambuild) ([]*codebuild.EnvironmentVariable, error) {
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(lambuild.Env.Variables))
-	for k, prog := range lambuild.Env.Variables {
-		s, err := prog.Run(data.Convert())
-		if err != nil {
-			return nil, fmt.Errorf("evaluate an expression: %w", err)
-		}
-		envs = append(envs, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(s),
-		})
-	}
-	return envs, nil
-}
-
-func setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *domain.Data) error {
-	envs, err := getLambuildEnvVars(data, buildspec.Lambuild)
-	if err != nil {
-		return err
-	}
-	input.EnvironmentVariablesOverride = envs
-
-	s, err := buildspec.ToYAML(data.Convert())
-	if err != nil {
-		return fmt.Errorf("marshal a buildspec: %w", err)
-	}
-	input.BuildspecOverride = aws.String(string(s))
-
-	return nil
-}
-
-func setListBuildInput(input *codebuild.StartBuildInput, contx template.Template, data *domain.Data, lambuild bspec.Lambuild, elem bspec.ListElement) error { //nolint:dupl
+func setListBuildInput(input *codebuild.StartBuildInput, contx template.Template, data *domain.Data, lambuild bspec.Lambuild, elem bspec.ListElement) error {
 	if elem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}
@@ -105,26 +74,9 @@ func setListBuildInput(input *codebuild.StartBuildInput, contx template.Template
 		return err
 	}
 
-	envMap := make(map[string]string, len(elem.Env.Variables)+len(lambuild.Env.Variables))
-	for k, prog := range lambuild.Env.Variables {
-		s, err := prog.Run(data.Convert())
-		if err != nil {
-			return fmt.Errorf("evaluate an expression: %w", err)
-		}
-		envMap[k] = s
+	if err := setEnvsToStartBuildInput(input, data, lambuild, elem.Env.Variables); err != nil {
+		return fmt.Errorf("set EnvironmentVariablesOverride: %w", err)
 	}
-	for k, v := range elem.Env.Variables {
-		envMap[k] = v
-	}
-
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
-	for k, v := range envMap {
-		envs = append(envs, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(v),
-		})
-	}
-	input.EnvironmentVariablesOverride = envs
 
 	return nil
 }

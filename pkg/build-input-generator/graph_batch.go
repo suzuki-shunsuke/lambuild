@@ -52,23 +52,7 @@ func handleGraph(buildStatusContext template.Template, buildInput *domain.BuildI
 	return nil
 }
 
-func extractGraph(logE *logrus.Entry, data *domain.Data, allElems []bspec.GraphElement) ([]bspec.GraphElement, error) {
-	identifiers := make(map[string]bspec.GraphElement, len(allElems))
-	for _, elem := range allElems {
-		if elem.If.Empty() {
-			identifiers[elem.Identifier] = elem
-			continue
-		}
-		f, err := elem.If.Run(data.Convert())
-		if err != nil {
-			return nil, fmt.Errorf("evaluate an expression: %w", err)
-		}
-		if !f {
-			continue
-		}
-		elem.If = expr.Bool{}
-		identifiers[elem.Identifier] = elem
-	}
+func extractGraphByDependency(identifiers map[string]bspec.GraphElement, logE *logrus.Entry) {
 	for {
 		removed := false
 		for identifier, elem := range identifiers {
@@ -88,6 +72,33 @@ func extractGraph(logE *logrus.Entry, data *domain.Data, allElems []bspec.GraphE
 			break
 		}
 	}
+}
+
+func extractGraphByIf(data *domain.Data, allElems []bspec.GraphElement, identifiers map[string]bspec.GraphElement) error {
+	for _, elem := range allElems {
+		if elem.If.Empty() {
+			identifiers[elem.Identifier] = elem
+			continue
+		}
+		f, err := elem.If.Run(data.Convert())
+		if err != nil {
+			return fmt.Errorf("evaluate an expression: %w", err)
+		}
+		if !f {
+			continue
+		}
+		elem.If = expr.Bool{}
+		identifiers[elem.Identifier] = elem
+	}
+	return nil
+}
+
+func extractGraph(logE *logrus.Entry, data *domain.Data, allElems []bspec.GraphElement) ([]bspec.GraphElement, error) {
+	identifiers := make(map[string]bspec.GraphElement, len(allElems))
+	if err := extractGraphByIf(data, allElems, identifiers); err != nil {
+		return nil, err
+	}
+	extractGraphByDependency(identifiers, logE)
 
 	if len(identifiers) == 0 {
 		return nil, nil
@@ -100,7 +111,7 @@ func extractGraph(logE *logrus.Entry, data *domain.Data, allElems []bspec.GraphE
 	return elems, nil
 }
 
-func setGraphBuildInput(input *codebuild.StartBuildInput, buildStatusContext template.Template, data *domain.Data, lambuild bspec.Lambuild, elem bspec.GraphElement) error { //nolint:dupl
+func setGraphBuildInput(input *codebuild.StartBuildInput, buildStatusContext template.Template, data *domain.Data, lambuild bspec.Lambuild, elem bspec.GraphElement) error {
 	if elem.Env.ComputeType != "" {
 		input.ComputeTypeOverride = aws.String(elem.Env.ComputeType)
 	}
@@ -121,26 +132,9 @@ func setGraphBuildInput(input *codebuild.StartBuildInput, buildStatusContext tem
 		return err
 	}
 
-	envMap := make(map[string]string, len(elem.Env.Variables)+len(lambuild.Env.Variables))
-	for k, prog := range lambuild.Env.Variables {
-		s, err := prog.Run(data.Convert())
-		if err != nil {
-			return fmt.Errorf("evaluate an expression: %w", err)
-		}
-		envMap[k] = s
+	if err := setEnvsToStartBuildInput(input, data, lambuild, elem.Env.Variables); err != nil {
+		return fmt.Errorf("set EnvironmentVariablesOverride: %w", err)
 	}
-	for k, v := range elem.Env.Variables {
-		envMap[k] = v
-	}
-
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
-	for k, v := range envMap {
-		envs = append(envs, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(v),
-		})
-	}
-	input.EnvironmentVariablesOverride = envs
 
 	return nil
 }
