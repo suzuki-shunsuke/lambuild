@@ -13,20 +13,57 @@ import (
 	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
-func newBool(s string) expr.Bool {
-	b, err := expr.NewBool(s)
+func panicErr(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func newBool(s string) expr.Bool {
+	b, err := expr.NewBool(s)
+	panicErr(err)
 	return b
 }
 
 func newTemplate(s string) template.Template {
 	b, err := template.New(s)
-	if err != nil {
-		panic(err)
-	}
+	panicErr(err)
 	return b
+}
+
+func Test_handleBuild(t *testing.T) {
+	t.Parallel()
+	data := []struct {
+		title     string
+		data      *domain.Data
+		buildspec bspec.Buildspec
+		exp       domain.BuildInput
+	}{
+		{
+			title:     "minimum",
+			data:      &domain.Data{},
+			buildspec: bspec.Buildspec{},
+			exp: domain.BuildInput{
+				Builds: []*codebuild.StartBuildInput{
+					{},
+				},
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+			},
+		},
+	}
+	for _, d := range data {
+		d := d
+		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
+			input, err := handleBuild(d.data, d.buildspec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(input, d.exp, cmpopts.IgnoreFields(codebuild.StartBuildInput{}, "BuildspecOverride")); diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
 }
 
 func Test_handleBuildItem(t *testing.T) {
