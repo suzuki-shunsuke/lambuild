@@ -160,14 +160,16 @@ func setMatrixBuildInput(data *domain.Data, buildStatusContext template.Template
 		}
 	}
 
-	envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
-	for k, v := range envMap {
-		envs = append(envs, &codebuild.EnvironmentVariable{
-			Name:  aws.String(k),
-			Value: aws.String(v),
-		})
+	if len(envMap) != 0 {
+		envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
+		for k, v := range envMap {
+			envs = append(envs, &codebuild.EnvironmentVariable{
+				Name:  aws.String(k),
+				Value: aws.String(v),
+			})
+		}
+		input.EnvironmentVariablesOverride = envs
 	}
-	input.EnvironmentVariablesOverride = envs
 
 	return nil
 }

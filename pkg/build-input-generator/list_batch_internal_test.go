@@ -6,11 +6,53 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
+	"github.com/google/go-cmp/cmp"
+	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 	"gopkg.in/yaml.v2"
 )
+
+func Test_handleList(t *testing.T) {
+	t.Parallel()
+	data := []struct {
+		title              string
+		input              domain.BuildInput
+		buildStatusContext template.Template
+		data               domain.Data
+		buildspec          bspec.Buildspec
+		isErr              bool
+		exp                domain.BuildInput
+	}{
+		{
+			title: "minimum",
+			exp: domain.BuildInput{
+				Empty: true,
+			},
+		},
+	}
+	logE := logrus.WithFields(logrus.Fields{})
+	for _, d := range data {
+		d := d
+		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
+			err := handleList(&d.input, logE, d.buildStatusContext, &d.data, d.buildspec)
+			if d.isErr {
+				if err == nil {
+					t.Fatal("err must be returned")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(d.exp, d.input); diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
+}
 
 func Test_setListBuildInput(t *testing.T) {
 	t.Parallel()

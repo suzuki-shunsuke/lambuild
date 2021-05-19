@@ -13,24 +13,6 @@ import (
 	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
-func panicErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func newBool(s string) expr.Bool {
-	b, err := expr.NewBool(s)
-	panicErr(err)
-	return b
-}
-
-func newTemplate(s string) template.Template {
-	b, err := template.New(s)
-	panicErr(err)
-	return b
-}
-
 func Test_handleBuild(t *testing.T) {
 	t.Parallel()
 	data := []struct {
@@ -87,7 +69,7 @@ func Test_handleBuildItem(t *testing.T) {
 			data:      &domain.Data{},
 			buildspec: bspec.Buildspec{},
 			item: bspec.Item{
-				If:    newBool("false"),
+				If:    expr.NewBoolForTest(t, "false"),
 				Image: "alpine", // ignored
 			},
 			exp: codebuild.StartBuildInput{},
@@ -103,11 +85,11 @@ func Test_handleBuildItem(t *testing.T) {
 				},
 			},
 			item: bspec.Item{
-				If:                 newBool("true"),
+				If:                 expr.NewBoolForTest(t, "true"),
 				Image:              "alpine",
 				ComputeType:        "BUILD_GENERAL1_SMALL",
 				EnvironmentType:    "LINUX_CONTAINER",
-				BuildStatusContext: newTemplate("foo"),
+				BuildStatusContext: template.NewForTest(t, "foo"),
 			},
 			exp: codebuild.StartBuildInput{
 				BuildStatusConfigOverride: &codebuild.BuildStatusConfig{

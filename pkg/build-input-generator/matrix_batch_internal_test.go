@@ -4,10 +4,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/codebuild"
+	"github.com/google/go-cmp/cmp"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
 	"github.com/suzuki-shunsuke/lambuild/pkg/mutex"
+	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
 func Test_handleMatrix(t *testing.T) {
@@ -126,6 +130,68 @@ func Test_filterExprList(t *testing.T) {
 			}
 			if !reflect.DeepEqual(d.exp, list) {
 				t.Fatalf("got %+v, wanted %+v", list, d.exp)
+			}
+		})
+	}
+}
+
+func Test_setMatrixBuildInput(t *testing.T) {
+	t.Parallel()
+	data := []struct {
+		title              string
+		data               domain.Data
+		buildStatusContext template.Template
+		dynamic            bspec.MatrixDynamic
+		lambuild           bspec.Lambuild
+		exp                codebuild.StartBuildInput
+	}{
+		{
+			title: "minimum",
+		},
+		{
+			title: "normal",
+			dynamic: bspec.MatrixDynamic{
+				Buildspec: bspec.ExprList{
+					"foo.yml",
+				},
+				Env: bspec.MatrixDynamicEnv{
+					Image: bspec.ExprList{
+						"alpine",
+					},
+					ComputeType: bspec.ExprList{
+						"BUILD_GENERAL1_SMALL",
+					},
+					Variables: map[string]bspec.ExprList{
+						"FOO": {
+							"YOO",
+						},
+					},
+				},
+			},
+			exp: codebuild.StartBuildInput{
+				BuildspecOverride:   aws.String("foo.yml"),
+				ImageOverride:       aws.String("alpine"),
+				ComputeTypeOverride: aws.String("BUILD_GENERAL1_SMALL"),
+				EnvironmentVariablesOverride: []*codebuild.EnvironmentVariable{
+					{
+						Name:  aws.String("FOO"),
+						Value: aws.String("YOO"),
+					},
+				},
+			},
+		},
+	}
+	for _, d := range data {
+		d := d
+		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
+			input := codebuild.StartBuildInput{}
+			err := setMatrixBuildInput(&d.data, d.buildStatusContext, d.dynamic, d.lambuild, &input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(d.exp, input); diff != "" {
+				t.Fatal(diff)
 			}
 		})
 	}

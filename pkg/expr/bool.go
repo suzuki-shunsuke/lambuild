@@ -3,6 +3,7 @@ package expr
 import (
 	"errors"
 	"fmt"
+	"testing"
 
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
@@ -31,6 +32,15 @@ func NewBool(s string) (Bool, error) {
 		return Bool{}, fmt.Errorf("compile a program: %w", err)
 	}
 	return Bool{prog: prog}, nil
+}
+
+func NewBoolForTest(t *testing.T, s string) Bool {
+	t.Helper()
+	a, err := NewBool(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
 }
 
 func (boolExpr *Bool) Empty() bool {

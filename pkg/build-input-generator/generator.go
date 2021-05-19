@@ -100,7 +100,9 @@ func setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.B
 	if err != nil {
 		return err
 	}
-	input.EnvironmentVariablesOverride = envs
+	if len(envs) != 0 {
+		input.EnvironmentVariablesOverride = envs
+	}
 
 	s, err := buildspec.ToYAML(data.Convert())
 	if err != nil {

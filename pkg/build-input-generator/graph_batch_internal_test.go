@@ -15,6 +15,46 @@ import (
 	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
+func Test_handleGraph(t *testing.T) {
+	t.Parallel()
+	data := []struct {
+		title              string
+		buildStatusContext template.Template
+		data               domain.Data
+		buildspec          bspec.Buildspec
+		isErr              bool
+		exp                domain.BuildInput
+	}{
+		{
+			title: "minimum",
+			exp: domain.BuildInput{
+				Empty: true,
+			},
+		},
+	}
+	logE := logrus.NewEntry(logrus.New())
+	for _, d := range data {
+		d := d
+		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
+			input := domain.BuildInput{}
+			err := handleGraph(d.buildStatusContext, &input, logE, &d.data, d.buildspec)
+			if d.isErr {
+				if err == nil {
+					t.Fatal("err must be returned")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(d.exp, input); diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
+}
+
 func Test_setGraphBuildInput(t *testing.T) {
 	t.Parallel()
 	data := []struct {
@@ -137,11 +177,11 @@ func Test_extractGraphByIf(t *testing.T) {
 				},
 				{
 					Identifier: "false",
-					If:         newBool("false"),
+					If:         expr.NewBoolForTest(t, "false"),
 				},
 				{
 					Identifier: "true",
-					If:         newBool("true"),
+					If:         expr.NewBoolForTest(t, "true"),
 				},
 			},
 			exp: map[string]bspec.GraphElement{
@@ -150,7 +190,7 @@ func Test_extractGraphByIf(t *testing.T) {
 				},
 				"true": {
 					Identifier: "true",
-					If:         newBool("true"),
+					If:         expr.NewBoolForTest(t, "true"),
 				},
 			},
 		},

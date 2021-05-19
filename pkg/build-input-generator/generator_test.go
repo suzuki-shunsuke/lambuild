@@ -15,18 +15,6 @@ import (
 	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
 
-func panicErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func newBool(s string) expr.Bool {
-	b, err := expr.NewBool(s)
-	panicErr(err)
-	return b
-}
-
 func TestGenerateInput(t *testing.T) {
 	t.Parallel()
 	data := []struct {
@@ -54,7 +42,7 @@ func TestGenerateInput(t *testing.T) {
 			data:  &domain.Data{},
 			buildspec: bspec.Buildspec{
 				Lambuild: bspec.Lambuild{
-					If: newBool("false"),
+					If: expr.NewBoolForTest(t, "false"),
 				},
 			},
 			repo: config.Repository{},

@@ -3,6 +3,7 @@ package template
 import (
 	"bytes"
 	"fmt"
+	"testing"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -46,6 +47,15 @@ func New(s string) (Template, error) {
 		return Template{}, fmt.Errorf("parse a template: %w", err)
 	}
 	return Template{template: tpl}, nil
+}
+
+func NewForTest(t *testing.T, s string) Template {
+	t.Helper()
+	a, err := New(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
 }
 
 func compile(s string) (*template.Template, error) {
