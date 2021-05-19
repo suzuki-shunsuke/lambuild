@@ -3,6 +3,7 @@ package expr
 import (
 	"errors"
 	"fmt"
+	"testing"
 
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
@@ -31,6 +32,15 @@ func NewString(s string) (String, error) {
 		return String{}, fmt.Errorf("compile a program: %w", err)
 	}
 	return String{prog: prog}, nil
+}
+
+func NewStringForTest(t *testing.T, s string) String {
+	t.Helper()
+	a, err := NewString(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
 }
 
 func (str *String) Empty() bool {
