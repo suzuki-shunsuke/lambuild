@@ -1,9 +1,9 @@
 package domain
 
 import (
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v35/github"
 )
 
@@ -29,8 +29,8 @@ func Test_extractLabelNames(t *testing.T) {
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
 			names := extractLabelNames(d.input)
-			if !reflect.DeepEqual(names, d.exp) {
-				t.Fatalf("got %+v, wanted %+v", names, d.exp)
+			if diff := cmp.Diff(names, d.exp); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}

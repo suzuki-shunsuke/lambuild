@@ -1,12 +1,13 @@
 package generator
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"github.com/suzuki-shunsuke/lambuild/pkg/expr"
@@ -15,6 +16,87 @@ import (
 )
 
 func Test_handleMatrix(t *testing.T) {
+	t.Parallel()
+	data := []struct {
+		title              string
+		data               domain.Data
+		buildspec          bspec.Buildspec
+		buildStatusContext template.Template
+		exp                domain.BuildInput
+	}{
+		{
+			title: "single build",
+			buildspec: bspec.Buildspec{
+				Batch: bspec.Batch{
+					BuildMatrix: bspec.Matrix{
+						Dynamic: bspec.MatrixDynamic{
+							Buildspec: bspec.ExprList{"foo.yml"},
+							Env: bspec.MatrixDynamicEnv{
+								Image:       bspec.ExprList{"alpine"},
+								ComputeType: bspec.ExprList{"BUILD_GENERAL1_SMALL"},
+								Variables: map[string]bspec.ExprList{
+									"FOO": {"foo"},
+								},
+							},
+						},
+						Static: bspec.MatrixStatic{},
+					},
+				},
+			},
+			exp: domain.BuildInput{
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+				Builds: []*codebuild.StartBuildInput{
+					{
+						BuildspecOverride:   aws.String("foo.yml"),
+						ImageOverride:       aws.String("alpine"),
+						ComputeTypeOverride: aws.String("BUILD_GENERAL1_SMALL"),
+						EnvironmentVariablesOverride: []*codebuild.EnvironmentVariable{
+							{
+								Name:  aws.String("FOO"),
+								Value: aws.String("foo"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			title: "batch build",
+			buildspec: bspec.Buildspec{
+				Batch: bspec.Batch{
+					BuildMatrix: bspec.Matrix{
+						Dynamic: bspec.MatrixDynamic{
+							Buildspec: bspec.ExprList{"foo.yml", "bar.yml"},
+						},
+						Static: bspec.MatrixStatic{},
+					},
+				},
+			},
+			exp: domain.BuildInput{
+				Batched:    true,
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+			},
+		},
+	}
+	logE := logrus.NewEntry(logrus.New())
+	for _, d := range data {
+		d := d
+		t.Run(d.title, func(t *testing.T) {
+			t.Parallel()
+			input := domain.BuildInput{
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+			}
+			if err := handleMatrix(&input, logE, d.buildStatusContext, &d.data, d.buildspec); err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(d.exp, input, cmpopts.IgnoreFields(codebuild.StartBuildBatchInput{}, "BuildspecOverride")); diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
+}
+
+func Test_expression(t *testing.T) {
 	t.Parallel()
 	data := []struct {
 		title      string
@@ -128,8 +210,8 @@ func Test_filterExprList(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(d.exp, list) {
-				t.Fatalf("got %+v, wanted %+v", list, d.exp)
+			if diff := cmp.Diff(d.exp, list); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}
@@ -155,12 +237,8 @@ func Test_setMatrixBuildInput(t *testing.T) {
 					"foo.yml",
 				},
 				Env: bspec.MatrixDynamicEnv{
-					Image: bspec.ExprList{
-						"alpine",
-					},
-					ComputeType: bspec.ExprList{
-						"BUILD_GENERAL1_SMALL",
-					},
+					Image:       bspec.ExprList{"alpine"},
+					ComputeType: bspec.ExprList{"BUILD_GENERAL1_SMALL"},
 					Variables: map[string]bspec.ExprList{
 						"FOO": {
 							"YOO",

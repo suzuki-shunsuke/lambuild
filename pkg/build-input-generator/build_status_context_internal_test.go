@@ -1,11 +1,11 @@
 package generator
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
+	"github.com/google/go-cmp/cmp"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"github.com/suzuki-shunsuke/lambuild/pkg/template"
 )
@@ -94,8 +94,8 @@ func Test_setBuildStatusContext(t *testing.T) {
 			if err := setBuildStatusContext(tpl, &d.data, &d.input); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(d.exp, d.input) {
-				t.Fatalf("got %+v, wanted %+v", d.input, d.exp)
+			if diff := cmp.Diff(d.exp, d.input); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}

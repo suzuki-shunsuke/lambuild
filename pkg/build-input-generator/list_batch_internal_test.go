@@ -1,12 +1,12 @@
 package generator
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sirupsen/logrus"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
@@ -31,6 +31,45 @@ func Test_handleList(t *testing.T) {
 				Empty: true,
 			},
 		},
+		{
+			title: "single build",
+			buildspec: bspec.Buildspec{
+				Batch: bspec.Batch{
+					BuildList: []bspec.ListElement{
+						{
+							Identifier: "foo",
+						},
+					},
+				},
+			},
+			exp: domain.BuildInput{
+				Builds: []*codebuild.StartBuildInput{
+					{},
+				},
+			},
+		},
+		{
+			title: "batch build",
+			input: domain.BuildInput{
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+			},
+			buildspec: bspec.Buildspec{
+				Batch: bspec.Batch{
+					BuildList: []bspec.ListElement{
+						{
+							Identifier: "foo",
+						},
+						{
+							Identifier: "bar",
+						},
+					},
+				},
+			},
+			exp: domain.BuildInput{
+				Batched:    true,
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+			},
+		},
 	}
 	logE := logrus.WithFields(logrus.Fields{})
 	for _, d := range data {
@@ -47,7 +86,7 @@ func Test_handleList(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(d.exp, d.input); diff != "" {
+			if diff := cmp.Diff(d.exp, d.input, cmpopts.IgnoreFields(codebuild.StartBuildInput{}, "BuildspecOverride"), cmpopts.IgnoreFields(codebuild.StartBuildBatchInput{}, "BuildspecOverride")); diff != "" {
 				t.Fatal(diff)
 			}
 		})
@@ -66,9 +105,7 @@ func Test_setListBuildInput(t *testing.T) {
 	}{
 		{
 			title: "minimum",
-			exp: codebuild.StartBuildInput{
-				EnvironmentVariablesOverride: []*codebuild.EnvironmentVariable{},
-			},
+			exp:   codebuild.StartBuildInput{},
 		},
 		{
 			title: "normal",
@@ -111,8 +148,8 @@ func Test_setListBuildInput(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(d.exp, d.input) {
-				t.Fatalf("got %+v, wanted %+v", d.input, d.exp)
+			if diff := cmp.Diff(d.exp, d.input); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}
@@ -163,8 +200,8 @@ func Test_extractBuildList(t *testing.T) {
 			for i, elem := range elems {
 				names[i] = elem.Identifier
 			}
-			if !reflect.DeepEqual(names, d.exp) {
-				t.Fatalf("got %+v, wanted %+v", names, d.exp)
+			if diff := cmp.Diff(names, d.exp); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}
@@ -216,8 +253,8 @@ variables:
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(envs, d.exp) {
-				t.Fatalf("got %+v, wanted %+v", envs, d.exp)
+			if diff := cmp.Diff(envs, d.exp); diff != "" {
+				t.Fatal(diff)
 			}
 		})
 	}
