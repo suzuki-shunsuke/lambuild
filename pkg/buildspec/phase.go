@@ -38,25 +38,33 @@ func (phases *Phases) Filter(param interface{}) (map[string]interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-	m["install"] = install
+	if len(install) != 0 {
+		m["install"] = install
+	}
 
 	preBuild, err := phases.PreBuild.Filter(param)
 	if err != nil {
 		return nil, err
 	}
-	m["pre_build"] = preBuild
+	if len(preBuild) != 0 {
+		m["pre_build"] = preBuild
+	}
 
 	build, err := phases.Build.Filter(param)
 	if err != nil {
 		return nil, err
 	}
-	m["build"] = build
+	if len(preBuild) != 0 {
+		m["build"] = build
+	}
 
 	postBuild, err := phases.PostBuild.Filter(param)
 	if err != nil {
 		return nil, err
 	}
-	m["post_build"] = postBuild
+	if len(postBuild) != 0 {
+		m["post_build"] = postBuild
+	}
 
 	return m, nil
 }
