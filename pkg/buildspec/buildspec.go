@@ -28,7 +28,9 @@ func (buildspec *Buildspec) filter(param interface{}) (map[string]interface{}, e
 	if err != nil {
 		return nil, err
 	}
-	m["phases"] = phases
+	if len(phases) != 0 {
+		m["phases"] = phases
+	}
 	return m, nil
 }
 
