@@ -1,7 +1,6 @@
 package generator
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -28,7 +27,70 @@ func Test_handleGraph(t *testing.T) {
 		{
 			title: "minimum",
 			exp: domain.BuildInput{
-				Empty: true,
+				Empty:      true,
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+			},
+		},
+		{
+			title: "single build",
+			exp: domain.BuildInput{
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+				Builds: []*codebuild.StartBuildInput{
+					{
+						DebugSessionEnabled:    aws.Bool(true),
+						PrivilegedModeOverride: aws.Bool(true),
+						ComputeTypeOverride:    aws.String("BUILD_GENERAL1_SMALL"),
+						ImageOverride:          aws.String("alpine:3.13.5"),
+						EnvironmentVariablesOverride: []*codebuild.EnvironmentVariable{
+							{
+								Name:  aws.String("FOO"),
+								Value: aws.String("FOO_VALUE"),
+							},
+						},
+					},
+				},
+			},
+			buildspec: bspec.Buildspec{
+				Batch: bspec.Batch{
+					BuildGraph: []bspec.GraphElement{
+						{
+							DebugSession: true,
+							Env: bspec.GraphEnv{
+								Image:          "alpine:3.13.5",
+								ComputeType:    "BUILD_GENERAL1_SMALL",
+								PrivilegedMode: true,
+								Variables: map[string]string{
+									"FOO": "FOO_VALUE",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			title: "batch build",
+			exp: domain.BuildInput{
+				Batched:    true,
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+			},
+			buildspec: bspec.Buildspec{
+				Batch: bspec.Batch{
+					BuildGraph: []bspec.GraphElement{
+						{
+							Identifier: "alpine",
+							Env: bspec.GraphEnv{
+								Image: "alpine",
+							},
+						},
+						{
+							Identifier: "ubuntu",
+							Env: bspec.GraphEnv{
+								Image: "ubuntu",
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -37,7 +99,9 @@ func Test_handleGraph(t *testing.T) {
 		d := d
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
-			input := domain.BuildInput{}
+			input := domain.BuildInput{
+				BatchBuild: &codebuild.StartBuildBatchInput{},
+			}
 			err := handleGraph(d.buildStatusContext, &input, logE, &d.data, d.buildspec)
 			if d.isErr {
 				if err == nil {
@@ -48,7 +112,7 @@ func Test_handleGraph(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(d.exp, input); diff != "" {
+			if diff := cmp.Diff(d.exp, input, cmpopts.IgnoreFields(codebuild.StartBuildInput{}, "BuildspecOverride"), cmpopts.IgnoreFields(codebuild.StartBuildBatchInput{}, "BuildspecOverride")); diff != "" {
 				t.Fatal(diff)
 			}
 		})
@@ -68,9 +132,7 @@ func Test_setGraphBuildInput(t *testing.T) {
 	}{
 		{
 			title: "minimum",
-			exp: codebuild.StartBuildInput{
-				EnvironmentVariablesOverride: []*codebuild.EnvironmentVariable{},
-			},
+			exp:   codebuild.StartBuildInput{},
 		},
 		{
 			title: "normal",
@@ -113,8 +175,8 @@ func Test_setGraphBuildInput(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(d.exp, d.input) {
-				t.Fatalf("got %+v, wanted %+v", d.input, d.exp)
+			if diff := cmp.Diff(d.exp, d.input); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}

@@ -1,9 +1,9 @@
 package domain_test
 
 import (
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/v35/github"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 )
@@ -32,8 +32,8 @@ func TestData_GetCommit(t *testing.T) {
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
 			commit := d.data.GetCommit()
-			if !reflect.DeepEqual(*commit, *d.exp) {
-				t.Fatalf("got %+v, wanted %+v", *commit, *d.exp)
+			if diff := cmp.Diff(*commit, *d.exp); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}
@@ -90,8 +90,8 @@ func TestData_GetPR(t *testing.T) {
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
 			pr := d.data.GetPR()
-			if !reflect.DeepEqual(d.exp, pr) {
-				t.Fatalf("got %+v, wanted %+v", pr, d.exp)
+			if diff := cmp.Diff(d.exp, pr); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}
@@ -125,8 +125,8 @@ func TestData_GetPRFiles(t *testing.T) {
 		t.Run(d.title, func(t *testing.T) {
 			t.Parallel()
 			files := d.data.GetPRFiles()
-			if !reflect.DeepEqual(d.exp, files) {
-				t.Fatalf("got %+v, wanted %+v", files, d.exp)
+			if diff := cmp.Diff(d.exp, files); diff != "" {
+				t.Fatalf(diff)
 			}
 		})
 	}

@@ -69,6 +69,10 @@ func setEnvsToStartBuildInput(input *codebuild.StartBuildInput, data *domain.Dat
 		envMap[k] = v
 	}
 
+	if len(envMap) == 0 {
+		return nil
+	}
+
 	envs := make([]*codebuild.EnvironmentVariable, 0, len(envMap))
 	for k, v := range envMap {
 		envs = append(envs, &codebuild.EnvironmentVariable{

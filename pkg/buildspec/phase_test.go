@@ -1,9 +1,9 @@
 package buildspec_test
 
 import (
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"gopkg.in/yaml.v2"
 )
@@ -52,8 +52,8 @@ runtime-versions:
 			if err := yaml.Unmarshal([]byte(d.yaml), &phase); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(d.exp, phase.Map) {
-				t.Fatalf("got %+v, wanted %+v", phase.Map, d.exp)
+			if diff := cmp.Diff(d.exp, phase.Map); diff != "" {
+				t.Fatalf(diff)
 			}
 			if len(phase.Commands) != d.numberOfCommands {
 				t.Fatalf("len(phase.Commands) = %d, wanted %d", len(phase.Commands), d.numberOfCommands)
