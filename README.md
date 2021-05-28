@@ -53,6 +53,15 @@ phases:
       - "echo foo"
 ```
 
+### Change CodeBuild Service Role conditionally
+
+If CodeBuild Service Role has strong permission,
+dangerous code can be run in CI of pull requests.
+`lambuild` supports to configure Service Role per hook,
+so we can use restricted Service Role for pull requests.
+
+For detail, please see [here](/docs/lambda-configuration.md#hookservice-role).
+
 ### Custom Environment Variables with GitHub Webhook Event and associated Pull Request
 
 e.g.
