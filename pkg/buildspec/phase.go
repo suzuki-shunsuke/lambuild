@@ -54,7 +54,7 @@ func (phases *Phases) Filter(param interface{}) (map[string]interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-	if len(preBuild) != 0 {
+	if len(build) != 0 {
 		m["build"] = build
 	}
 
