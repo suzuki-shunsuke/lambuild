@@ -58,6 +58,7 @@ type CodeBuild struct {
 }
 
 type Hook struct {
-	If     expr.Bool
-	Config string
+	If          expr.Bool
+	Config      string
+	ServiceRole string `yaml:"service-role"`
 }

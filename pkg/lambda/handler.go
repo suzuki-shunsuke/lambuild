@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
 	generator "github.com/suzuki-shunsuke/lambuild/pkg/build-input-generator"
+	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/domain"
 	"golang.org/x/sync/errgroup"
@@ -132,44 +133,54 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 	for _, buildspec := range buildspecs {
 		buildspec := buildspec
 		eg.Go(func() error {
-			buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
-			if err != nil {
-				logE.WithError(err).Error("generate a build input")
-				return fmt.Errorf("generate a build input: %w", err)
-			}
-
-			if buildInput.Empty {
-				return nil
-			}
-
-			if buildInput.Batched {
-				buildInput.BatchBuild.ProjectName = aws.String(repo.CodeBuild.ProjectName)
-				buildInput.BatchBuild.SourceVersion = aws.String(data.SHA)
-				buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
-				if err != nil {
-					logE.WithError(err).Error("start a batch build")
-					return fmt.Errorf("start a batch build: %w", err)
-				}
-				logE.WithFields(logrus.Fields{
-					"build_arn": *buildOut.BuildBatch.Arn,
-				}).Info("start a batch build")
-				return nil
-			}
-
-			for _, build := range buildInput.Builds {
-				build.ProjectName = aws.String(repo.CodeBuild.ProjectName)
-				build.SourceVersion = aws.String(data.SHA)
-				buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, build)
-				if err != nil {
-					logE.WithError(err).Error("start a build")
-					return fmt.Errorf("start a build: %w", err)
-				}
-				logE.WithFields(logrus.Fields{
-					"build_arn": *buildOut.Build.Arn,
-				}).Info("start a build")
-			}
-			return nil
+			return handler.handleBuildspec(ctx, logE, data, buildspec, repo, hook)
 		})
 	}
 	return eg.Wait() //nolint:wrapcheck
+}
+
+func (handler *Handler) handleBuildspec(ctx context.Context, logE *logrus.Entry, data *domain.Data, buildspec bspec.Buildspec, repo config.Repository, hook config.Hook) error {
+	buildInput, err := generator.GenerateInput(logE, handler.Config.BuildStatusContext, data, buildspec, repo)
+	if err != nil {
+		logE.WithError(err).Error("generate a build input")
+		return fmt.Errorf("generate a build input: %w", err)
+	}
+
+	if buildInput.Empty {
+		return nil
+	}
+
+	if buildInput.Batched {
+		buildInput.BatchBuild.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+		buildInput.BatchBuild.SourceVersion = aws.String(data.SHA)
+		if hook.ServiceRole != "" {
+			buildInput.BatchBuild.ServiceRoleOverride = aws.String(hook.ServiceRole)
+		}
+		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
+		if err != nil {
+			logE.WithError(err).Error("start a batch build")
+			return fmt.Errorf("start a batch build: %w", err)
+		}
+		logE.WithFields(logrus.Fields{
+			"build_arn": *buildOut.BuildBatch.Arn,
+		}).Info("start a batch build")
+		return nil
+	}
+
+	for _, build := range buildInput.Builds {
+		build.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+		build.SourceVersion = aws.String(data.SHA)
+		if hook.ServiceRole != "" {
+			build.ServiceRoleOverride = aws.String(hook.ServiceRole)
+		}
+		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, build)
+		if err != nil {
+			logE.WithError(err).Error("start a build")
+			return fmt.Errorf("start a build: %w", err)
+		}
+		logE.WithFields(logrus.Fields{
+			"build_arn": *buildOut.Build.Arn,
+		}).Info("start a build")
+	}
+	return nil
 }
