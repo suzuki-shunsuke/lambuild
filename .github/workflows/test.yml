@@ -22,6 +22,8 @@ jobs:
       with:
         version: v1.40
 
+    - run: go test -v ./... -race -covermode=atomic
+
     - name: remove changes
       # Sometimes it is failed to release by goreleaser due to changes of go.sum
       run: git checkout -- .
