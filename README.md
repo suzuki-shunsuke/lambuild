@@ -36,7 +36,7 @@ Instead of [AWS CodeBuild's GitHub webhook events support](https://docs.aws.amaz
 
 ### Multiple buildspec files
 
-[GitHub Actions](https://docs.github.com/en/actions) supports multiple workflow files on `.github/workflows` directory.
+[GitHub Actions](https://docs.github.com/en/actions) supports multiple workflow files in `.github/workflows` directory.
 Like GitHub Actions, `lambuild` supports multiple buildspec files.
 
 ### Conditional builds
@@ -56,9 +56,9 @@ phases:
 
 ### Change CodeBuild Service Role conditionally
 
-If CodeBuild Service Role has strong permission,
+If CodeBuild Service Role has strong permissions,
 dangerous code can be run in CI of pull requests.
-`lambuild` supports to configure Service Role per hook,
+`lambuild` supports configuring Service Role per hook,
 so we can use restricted Service Role for pull requests.
 
 For detail, please see [here](/docs/lambda-configuration.md#hookservice-role).
@@ -151,7 +151,7 @@ User = (push, pull_request) => GitHub = (webhook) => API Gateway => Lambda => Co
 
 _This image is created with [diagrams.net](https://www.diagrams.net/)_
 
-## How to work
+## How does it work?
 
 1. Lambda Functions is called via GitHub Webhook
 1. Request is filtered with hook configuration
@@ -159,7 +159,7 @@ _This image is created with [diagrams.net](https://www.diagrams.net/)_
 1. buildspec is generated
 1. Build or Batch Build is run
 
-## Supported GitHub Event
+## Supported GitHub Events
 
 * [push](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#push)
 * [pull_request](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#pull_request)
