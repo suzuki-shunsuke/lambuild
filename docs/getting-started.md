@@ -33,7 +33,7 @@
   * Check `Pull Requests` and `Pushes` events
 * Try running lambuild
   * Commit files and push to repository and open a pull request
-  * Confirm build is run expectedly
+  * Confirm build is running as expected
 
 ## Sample Configuration
 
@@ -42,7 +42,7 @@
 
 ## Deploy Lambda Function
 
-Download a zip file from [GitHub Releases](https://github.com/suzuki-shunsuke/lambuild/releases) and deploy it to the Lambda Function.
+Download the zip file from [GitHub Releases](https://github.com/suzuki-shunsuke/lambuild/releases) and deploy it to the Lambda Function.
 
 ## Try lambuild
 
