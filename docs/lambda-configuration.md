@@ -3,7 +3,7 @@
 ## Configuration source
 
 `lambuild` reads a structured configuration from the configuration source.
-`lambuild` supports the some type of configuration sources, and we can specify the source type by the environment variable `CONFIG_SOURCE`.
+`lambuild` supports different types of configuration sources, and we can specify the source type by the environment variable `CONFIG_SOURCE`.
 The default source type is `env`.
 
 CONFIG_SOURCE | description
@@ -60,8 +60,8 @@ path | environment variable name | type | required | default | description
 
 path | environment variable name | type | required | description
 --- | --- | --- | --- | ---
-.parameter-name.github-token | SSM_PARAMETER_NAME_GITHUB_TOKEN | string | true | Systems Manager's Parameter Name which GitHub Personal Access Token is registered
-.parameter-name.webhook-secret | SSM_PARAMETER_NAME_WEBHOOK_SECRET | string | true | Systems Manager's Parameter Name which GitHub Webhook secret is registered
+.parameter-name.github-token | SSM_PARAMETER_NAME_GITHUB_TOKEN | string | true | Systems Manager's Parameter Name against which GitHub Personal Access Token is registered
+.parameter-name.webhook-secret | SSM_PARAMETER_NAME_WEBHOOK_SECRET | string | true | Systems Manager's Parameter Name against which GitHub Webhook secret is registered
 
 ## type: repository
 
@@ -83,14 +83,14 @@ path | type | required | default | description
 
 ### hook.config
 
-If `.config` is a directory, files on the directory are treated as configuration files and procceeded in parallel, which means builds are run in parallel.
-The file extensiono of configuration file must be `.yml` or `.yaml`, otherwise the file is ignored.
+If `.config` is a directory, files in the directory are treated as configuration files and procceeded in parallel, which means builds are run in parallel.
+The file extension of configuration file must be `.yml` or `.yaml`, otherwise the file is ignored.
 
 ### hook.service-role
 
-If CodeBuild Service Role has strong permission,
+If CodeBuild Service Role has strong permissions,
 dangerous code can be run in CI of pull requests.
-`lambuild` supports to configure Service Role per hook,
+`lambuild` supports configuring Service Role per hook,
 so we can use restricted Service Role for pull requests.
 
 e.g.
