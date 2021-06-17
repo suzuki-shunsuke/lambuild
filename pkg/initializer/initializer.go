@@ -102,7 +102,11 @@ func validateRepositories(repos []config.Repository) error {
 			return errors.New(`the repository 'name' is required`)
 		}
 		if repo.CodeBuild.ProjectName == "" {
-			return fmt.Errorf(`'project-name' is required (repo: %s)`, repo.Name)
+			for _, hook := range repo.Hooks {
+				if hook.ProjectName == "" {
+					return fmt.Errorf(`'project-name' is required (repo: %s)`, repo.Name)
+				}
+			}
 		}
 	}
 	return nil

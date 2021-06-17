@@ -61,4 +61,5 @@ type Hook struct {
 	If          expr.Bool
 	Config      string
 	ServiceRole string `yaml:"service-role"`
+	ProjectName string `yaml:"project-name"`
 }

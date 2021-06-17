@@ -116,6 +116,9 @@ func (handler *Handler) handleEvent(ctx context.Context, data *domain.Data) erro
 		logE.Debug("no hook matches")
 		return nil
 	}
+	if hook.ProjectName != "" {
+		data.AWS.CodeBuildProjectName = hook.ProjectName
+	}
 	logE = logE.WithFields(logrus.Fields{
 		"config": hook.Config,
 	})
@@ -150,8 +153,13 @@ func (handler *Handler) handleBuildspec(ctx context.Context, logE *logrus.Entry,
 		return nil
 	}
 
+	projectName := repo.CodeBuild.ProjectName
+	if hook.ProjectName != "" {
+		projectName = hook.ProjectName
+	}
+
 	if buildInput.Batched {
-		buildInput.BatchBuild.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+		buildInput.BatchBuild.ProjectName = aws.String(projectName)
 		buildInput.BatchBuild.SourceVersion = aws.String(data.SHA)
 		if hook.ServiceRole != "" {
 			buildInput.BatchBuild.ServiceRoleOverride = aws.String(hook.ServiceRole)
@@ -168,7 +176,7 @@ func (handler *Handler) handleBuildspec(ctx context.Context, logE *logrus.Entry,
 	}
 
 	for _, build := range buildInput.Builds {
-		build.ProjectName = aws.String(repo.CodeBuild.ProjectName)
+		build.ProjectName = aws.String(projectName)
 		build.SourceVersion = aws.String(data.SHA)
 		if hook.ServiceRole != "" {
 			build.ServiceRoleOverride = aws.String(hook.ServiceRole)
