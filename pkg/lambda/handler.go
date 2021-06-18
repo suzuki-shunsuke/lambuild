@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/google/go-github/v35/github"
 	"github.com/sirupsen/logrus"
@@ -158,13 +160,24 @@ func (handler *Handler) handleBuildspec(ctx context.Context, logE *logrus.Entry,
 		projectName = hook.ProjectName
 	}
 
+	cb := handler.CodeBuild
+	assumeRoleARN := repo.CodeBuild.AssumeRoleARN
+	if hook.AssumeRoleARN != "" {
+		assumeRoleARN = hook.AssumeRoleARN
+	}
+	if assumeRoleARN != "" {
+		sess := session.Must(session.NewSession())
+		creds := stscreds.NewCredentials(sess, assumeRoleARN)
+		cb = codebuild.New(sess, &aws.Config{Credentials: creds, Region: aws.String(handler.Config.Region)})
+	}
+
 	if buildInput.Batched {
 		buildInput.BatchBuild.ProjectName = aws.String(projectName)
 		buildInput.BatchBuild.SourceVersion = aws.String(data.SHA)
 		if hook.ServiceRole != "" {
 			buildInput.BatchBuild.ServiceRoleOverride = aws.String(hook.ServiceRole)
 		}
-		buildOut, err := handler.CodeBuild.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
+		buildOut, err := cb.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
 		if err != nil {
 			logE.WithError(err).Error("start a batch build")
 			return fmt.Errorf("start a batch build: %w", err)
@@ -181,7 +194,7 @@ func (handler *Handler) handleBuildspec(ctx context.Context, logE *logrus.Entry,
 		if hook.ServiceRole != "" {
 			build.ServiceRoleOverride = aws.String(hook.ServiceRole)
 		}
-		buildOut, err := handler.CodeBuild.StartBuildWithContext(ctx, build)
+		buildOut, err := cb.StartBuildWithContext(ctx, build)
 		if err != nil {
 			logE.WithError(err).Error("start a build")
 			return fmt.Errorf("start a build: %w", err)
