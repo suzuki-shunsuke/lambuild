@@ -54,12 +54,14 @@ type Repository struct {
 }
 
 type CodeBuild struct {
-	ProjectName string `yaml:"project-name"`
+	ProjectName   string `yaml:"project-name"`
+	AssumeRoleARN string `yaml:"assume-role-arn"`
 }
 
 type Hook struct {
-	If          expr.Bool
-	Config      string
-	ServiceRole string `yaml:"service-role"`
-	ProjectName string `yaml:"project-name"`
+	If            expr.Bool
+	Config        string
+	ServiceRole   string `yaml:"service-role"`
+	ProjectName   string `yaml:"project-name"`
+	AssumeRoleARN string `yaml:"assume-role-arn"`
 }

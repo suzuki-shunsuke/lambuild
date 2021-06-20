@@ -70,6 +70,7 @@ path | type | required | example | description
 .name | string | true | `suzuki-shunsuke/test-lambuild` | repository full name `<repo_owner>/<repo_name>`
 .hooks | [][hook](#type-hook) | true | |
 .codebuild.project-name | string | true | `test-lambuild` | 
+.codebuild.assume-role-arn | string | false | | Assume Role ARN to start builds
 
 If an event doesn't match any hook's condition, the event is ignored.
 
@@ -80,7 +81,8 @@ path | type | required | default | description
 .config | string | false | `lambuild.yaml` | relative path from repository's root directory to the buildspec template file or directory on the source repository. 
 .if | string expression | false | "true" | the evaluated result must be a boolean. if an event doesn't match the condition, the event is ignored. If this field is empty, no event is ignored
 .service-role | string | false | | CodeBuild Service Role ARN
-.project-name | string | false | | CodeBuild Service Role ARN
+.project-name | string | false | | CodeBuild Project Name
+.assume-role-arn | string | false | | Assume Role ARN to start builds
 
 ### hook.config
 
