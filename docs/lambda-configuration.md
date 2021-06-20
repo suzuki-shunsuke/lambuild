@@ -80,6 +80,7 @@ path | type | required | default | description
 .config | string | false | `lambuild.yaml` | relative path from repository's root directory to the buildspec template file or directory on the source repository. 
 .if | string expression | false | "true" | the evaluated result must be a boolean. if an event doesn't match the condition, the event is ignored. If this field is empty, no event is ignored
 .service-role | string | false | | CodeBuild Service Role ARN
+.project-name | string | false | | CodeBuild Service Role ARN
 
 ### hook.config
 

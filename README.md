@@ -13,7 +13,7 @@ Instead of [AWS CodeBuild's GitHub webhook events support](https://docs.aws.amaz
 
 * [Multiple buildspec files](#multiple-buildspec-files)
 * [Conditional builds](#conditional-builds)
-* [Change CodeBuild Service Role conditionally](#change-codebuild-service-role-conditionally)
+* Change CodeBuild Project conditionally
 * [Custom Environment Variables with GitHub Webhook Event and associated Pull Request](#custom-environment-variables-with-gitHub-webhook-event-and-associated-pull-request)
 * [Override Build Configuration like `image` in buildspec](#override-build-configuration-like-image-in-buildspec)
 * [Run multiple builds based on the same buildspec without Batch Build](#run-multiple-builds-based-on-the-same-buildspec-without-batch-build)
@@ -53,15 +53,6 @@ phases:
     commands:
       - "echo foo"
 ```
-
-### Change CodeBuild Service Role conditionally
-
-If CodeBuild Service Role has strong permissions,
-dangerous code can be run in CI of pull requests.
-`lambuild` supports configuring Service Role per hook,
-so we can use restricted Service Role for pull requests.
-
-For detail, please see [here](/docs/lambda-configuration.md#hookservice-role).
 
 ### Custom Environment Variables with GitHub Webhook Event and associated Pull Request
 
