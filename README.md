@@ -138,7 +138,7 @@ batch:
 User = (push, pull_request) => GitHub = (webhook) => API Gateway => Lambda => CodeBuild
 ```
 
-![lambuild-architecture](https://user-images.githubusercontent.com/13323303/116976740-80f1d300-acfc-11eb-96f5-7fb49f0e7e25.png)
+![lambuild-architecture](https://user-images.githubusercontent.com/13323303/123712123-a807f380-d8ac-11eb-8fd4-ad93bec497f2.png)
 
 _This image is created with [diagrams.net](https://www.diagrams.net/)_
 
