@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
-	"github.com/google/go-github/v35/github"
+	"github.com/google/go-github/v36/github"
 	"github.com/sirupsen/logrus"
 	generator "github.com/suzuki-shunsuke/lambuild/pkg/build-input-generator"
 	bspec "github.com/suzuki-shunsuke/lambuild/pkg/buildspec"

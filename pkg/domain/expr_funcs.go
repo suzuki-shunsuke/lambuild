@@ -3,7 +3,7 @@ package domain
 import (
 	"context"
 
-	"github.com/google/go-github/v35/github"
+	"github.com/google/go-github/v36/github"
 )
 
 // Functions and methods in this file is called at antonmedv/expr's program.
