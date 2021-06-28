@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/sirupsen/logrus"
@@ -42,16 +43,18 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 
 	if cfg.SSMParameter.ParameterName.GitHubToken == "" {
 		cfg.SSMParameter.ParameterName.GitHubToken = os.Getenv("SSM_PARAMETER_NAME_GITHUB_TOKEN")
-		if cfg.SSMParameter.ParameterName.GitHubToken == "" {
-			return errors.New("the configuration 'SSM_PARAMETER_NAME_GITHUB_TOKEN' is required")
-		}
 	}
 
 	if cfg.SSMParameter.ParameterName.WebhookSecret == "" {
 		cfg.SSMParameter.ParameterName.WebhookSecret = os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET")
-		if cfg.SSMParameter.ParameterName.WebhookSecret == "" {
-			return errors.New("the configuration 'SSM_PARAMETER_NAME_WEBHOOK_SECRET' is required")
-		}
+	}
+
+	if cfg.SecretsManager.SecretID == "" {
+		cfg.SecretsManager.SecretID = os.Getenv("SECRETS_MANAGER_SECRET_ID")
+	}
+
+	if cfg.SecretsManager.VersionID == "" {
+		cfg.SecretsManager.VersionID = os.Getenv("SECRETS_MANAGER_VERSION_ID")
 	}
 
 	if cfg.BuildStatusContext.Empty() {
@@ -71,12 +74,24 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 	handler.Config = cfg
 
 	sess := session.Must(session.NewSession())
-	ssmSvc := ssm.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
-	secret, err := readSecretFromSSM(ctx, ssmSvc, handler.Config.SSMParameter.ParameterName)
-	if err != nil {
-		return err
+	switch {
+	case cfg.SSMParameter.ParameterName.GitHubToken != "":
+		ssmSvc := ssm.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
+		secret, err := readSecretFromSSM(ctx, ssmSvc, handler.Config.SSMParameter.ParameterName)
+		if err != nil {
+			return err
+		}
+		handler.Secret = secret
+	case cfg.SecretsManager.SecretID != "":
+		svc := secretsmanager.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
+		secret, err := readSecretFromSecretsManager(ctx, svc, handler.Config.SecretsManager)
+		if err != nil {
+			return err
+		}
+		handler.Secret = secret
+	default:
+		return errors.New("secrets aren't configured")
 	}
-	handler.Secret = secret
 
 	ghClient := gh.New(ctx, handler.Secret.GitHubToken)
 	handler.GitHub = &ghClient

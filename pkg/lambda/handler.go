@@ -33,8 +33,8 @@ type CodeBuild interface {
 }
 
 type Secret struct {
-	GitHubToken   string `json:"github_token"`
-	WebhookSecret string `json:"webhook_secret"`
+	GitHubToken   string `json:"github-token"`
+	WebhookSecret string `json:"webhook-secret"`
 }
 
 // Do is the Lambda Function's endpoint.
