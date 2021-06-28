@@ -15,6 +15,7 @@ type Config struct {
 	BuildStatusContext        template.Template `yaml:"build-status-context"`
 	ErrorNotificationTemplate template.Template `yaml:"error-notification-template"`
 	SSMParameter              SSMParameter      `yaml:"ssm-parameter"`
+	SecretsManager            SecretsManager    `yaml:"secrets-manager"`
 }
 
 type LogLevel struct {
@@ -64,4 +65,9 @@ type Hook struct {
 	ServiceRole   string `yaml:"service-role"`
 	ProjectName   string `yaml:"project-name"`
 	AssumeRoleARN string `yaml:"assume-role-arn"`
+}
+
+type SecretsManager struct {
+	SecretID  string `yaml:"secret-id"`
+	VersionID string `yaml:"version-id"`
 }

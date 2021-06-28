@@ -2,10 +2,12 @@ package initializer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
 	"github.com/suzuki-shunsuke/lambuild/pkg/lambda"
@@ -43,22 +45,20 @@ func getSecret(ctx context.Context, svc SSM, key string) (string, error) {
 	return *out.Parameter.Value, nil
 }
 
-// func (handler *Handler) readSecret(ctx context.Context, sess *session.Session) error {
-// 	svc := secretsmanager.New(sess, aws.NewConfig().WithRegion(handler.Region))
-// 	input := &secretsmanager.GetSecretValueInput{
-// 		SecretId: aws.String(handler.SecretID),
-// 	}
-// 	if handler.SecretVersionID != "" {
-// 		input.VersionId = aws.String(handler.SecretVersionID)
-// 	}
-// 	output, err := svc.GetSecretValueWithContext(ctx, input)
-// 	if err != nil {
-// 		return fmt.Errorf("get secret value from AWS SecretsManager: %w", err)
-// 	}
-// 	secret := Secret{}
-// 	if err := json.Unmarshal([]byte(*output.SecretString), &secret); err != nil {
-// 		return fmt.Errorf("parse secret value: %w", err)
-// 	}
-// 	handler.Secret = secret
-// 	return nil
-// }
+func readSecretFromSecretsManager(ctx context.Context, svc *secretsmanager.SecretsManager, secretConfig config.SecretsManager) (lambda.Secret, error) {
+	ret := lambda.Secret{}
+	input := &secretsmanager.GetSecretValueInput{
+		SecretId: aws.String(secretConfig.SecretID),
+	}
+	if secretConfig.VersionID != "" {
+		input.VersionId = aws.String(secretConfig.VersionID)
+	}
+	output, err := svc.GetSecretValueWithContext(ctx, input)
+	if err != nil {
+		return ret, fmt.Errorf("get secret value from AWS SecretsManager: %w", err)
+	}
+	if err := json.Unmarshal([]byte(*output.SecretString), &ret); err != nil {
+		return ret, fmt.Errorf("parse secret value: %w", err)
+	}
+	return ret, nil
+}
