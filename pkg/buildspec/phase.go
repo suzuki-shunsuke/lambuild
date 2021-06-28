@@ -32,7 +32,7 @@ func (phase *Phase) Filter(param interface{}) (map[string]interface{}, error) {
 }
 
 func (phases *Phases) Filter(param interface{}) (map[string]interface{}, error) {
-	m := make(map[string]interface{}, 4)
+	m := make(map[string]interface{}, 4) //nolint:gomnd
 
 	install, err := phases.Install.Filter(param)
 	if err != nil {
