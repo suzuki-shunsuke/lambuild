@@ -64,4 +64,4 @@ This is the reason why the type of parameters like `getPRFileNames` is function.
 
 name | type | example | description
 --- | --- | --- | ---
-value | `func(interface{}) interface{}` | `value(event.Payload.PullRequest.Head.Ref)` | get a value from a pointer. If the argument isn't a pointer, panic occurs
+value | `func(interface{}) interface{}` | `value(event.Payload.PullRequest.Head.Ref)` | get a value from a pointer. If the argument isn't a pointer, the argument is returned

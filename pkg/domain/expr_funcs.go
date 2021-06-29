@@ -28,7 +28,11 @@ func setExprFuncs(env map[string]interface{}) map[string]interface{} {
 }
 
 func Value(ptr interface{}) interface{} {
-	return reflect.ValueOf(ptr).Elem().Interface()
+	v := reflect.ValueOf(ptr)
+	if v.Kind() != reflect.Ptr {
+		return ptr
+	}
+	return v.Elem().Interface()
 }
 
 func (data *Data) GetCommit() *github.Commit {
