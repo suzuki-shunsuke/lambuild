@@ -20,6 +20,7 @@ The following parameters are passed to expressions.
 .getPRFiles | `func() []*github.CommitFile` | | get associated pull request files
 .getPRFileNames | `func() []string` | | get associated pull request file paths
 .getPRLabelNames | `func() []string` | | get associated pull request label names
+.util | `map[string]interface{}` | | [utility functions](#utility-functions)
 
 Please see [go-github's document](https://pkg.go.dev/github.com/google/go-github/v36/github) too.
 
@@ -58,3 +59,9 @@ This is the reason why the type of parameters like `getPRFileNames` is function.
 .FullName | string | `suzuki-shunsuke/test-lambuild` |
 .Owner | string | `suzuki-shunsuke` |
 .Name | string | `test-lambuild` |
+
+## Utility Functions
+
+name | type | example | description
+--- | --- | --- | ---
+value | `func(interface{}) interface{}` | `util.value(event.Payload.PullRequest.Head.Ref)` | get a value from a pointer. If the argument isn't a pointer, the argument is returned
