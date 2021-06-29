@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/google/go-github/v36/github"
 )
@@ -16,7 +17,18 @@ import (
 // > For example, if your function going to divide by zero 1/0 Expr will also work correctly as it will panic.
 
 func setExprFuncs(env map[string]interface{}) map[string]interface{} {
-	return env
+	m := make(map[string]interface{}, len(env)+1)
+	for k, v := range env {
+		m[k] = v
+	}
+	m["util"] = map[string]interface{}{
+		"value": Value,
+	}
+	return m
+}
+
+func Value(ptr interface{}) interface{} {
+	return reflect.ValueOf(ptr).Elem().Interface()
 }
 
 func (data *Data) GetCommit() *github.Commit {
