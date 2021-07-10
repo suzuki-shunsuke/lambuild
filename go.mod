@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antonmedv/expr v1.8.9
 	github.com/aws/aws-lambda-go v1.24.0
-	github.com/aws/aws-sdk-go v1.39.3
+	github.com/aws/aws-sdk-go v1.39.4
 	github.com/google/go-cmp v0.5.6
 	github.com/google/go-github/v36 v36.0.0
 	github.com/sirupsen/logrus v1.8.1
