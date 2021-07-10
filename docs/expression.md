@@ -21,11 +21,11 @@ The following parameters are passed to expressions.
 .getPRFileNames | `func() []string` | | get associated pull request file paths
 .getPRLabelNames | `func() []string` | | get associated pull request label names
 
-Please see [go-github's document](https://pkg.go.dev/github.com/google/go-github/v36/github) too.
+Please see [go-github's document](https://pkg.go.dev/github.com/google/go-github/v37/github) too.
 
-* [*github.Commit](https://pkg.go.dev/github.com/google/go-github/v36/github#Commit)
-* [*github.PullRequest](https://pkg.go.dev/github.com/google/go-github/v36/github#PullRequest)
-* [*github.CommitFile](https://pkg.go.dev/github.com/google/go-github/v36/github#CommitFile)
+* [*github.Commit](https://pkg.go.dev/github.com/google/go-github/v37/github#Commit)
+* [*github.PullRequest](https://pkg.go.dev/github.com/google/go-github/v37/github#PullRequest)
+* [*github.CommitFile](https://pkg.go.dev/github.com/google/go-github/v37/github#CommitFile)
 
 _Note that the above go-github version may be different from actual version which lambuild uses, because it is difficult to maintain the document properly. Please check [go.mod](../go.mod)._
 
@@ -39,7 +39,7 @@ This is the reason why the type of parameters like `getPRFileNames` is function.
 --- | --- | --- | ---
 .Body | string | | GitHub Webhook's payload
 .Headers | [Headers](#type-headers) | | [GitHub Webhook's Delivery headers](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#delivery-headers)
-.Payload | interface{} | | [*github.PullRequestEvent](https://pkg.go.dev/github.com/google/go-github/v36/github#PullRequestEvent) or [*github.PushEvent](https://pkg.go.dev/github.com/google/go-github/v36/github#PushEvent)
+.Payload | interface{} | | [*github.PullRequestEvent](https://pkg.go.dev/github.com/google/go-github/v37/github#PullRequestEvent) or [*github.PushEvent](https://pkg.go.dev/github.com/google/go-github/v37/github#PushEvent)
 
 ## Type: Headers
 
