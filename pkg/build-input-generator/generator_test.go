@@ -34,7 +34,6 @@ func TestGenerateInput(t *testing.T) {
 				Builds: []*codebuild.StartBuildInput{
 					{},
 				},
-				BatchBuild: &codebuild.StartBuildBatchInput{},
 			},
 		},
 		{

@@ -16,9 +16,7 @@ func TestBuildspec_filter(t *testing.T) {
 	}{
 		{
 			title: "minimum",
-			exp: map[string]interface{}{
-				"batch": Batch{},
-			},
+			exp:   map[string]interface{}{},
 		},
 	}
 	for _, d := range data {

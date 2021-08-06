@@ -5,11 +5,6 @@ We call these files as `lambuild.yaml`, but we can rename freely.
 The format of lambuild configuration file is based on buildspec.
 
 * [Build specification reference for CodeBuild](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html)
-* [Batch build buildspec reference](https://docs.aws.amazon.com/codebuild/latest/userguide/batch-build-buildspec.html)
-
-## For Batch Build
-
-Please see [lambuild.yaml for Batch Build](lambuild-batch-yaml.md)
 
 ## Example
 
