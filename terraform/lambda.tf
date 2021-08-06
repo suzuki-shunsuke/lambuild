@@ -10,11 +10,10 @@ resource "aws_lambda_function" "main" {
   environment {
     variables = {
       CONFIG = templatefile("${path.module}/${var.config_path}", {
-        region                            = var.region
-        repo_full_name                    = var.repo_full_name
-        ssm_parameter_github_token_name   = aws_ssm_parameter.github_token.name
-        ssm_parameter_webhook_secret_name = aws_ssm_parameter.webhook_secret.name
-        project_name                      = var.project_name
+        region         = var.region
+        repo_full_name = var.repo_full_name
+        secret_id      = aws_secretsmanager_secret.main.id
+        project_name   = var.project_name
       })
     }
   }
@@ -68,8 +67,7 @@ data "aws_iam_policy_document" "read-secret" {
   statement {
     actions = ["ssm:GetParameter"]
     resources = [
-      aws_ssm_parameter.github_token.arn,
-      aws_ssm_parameter.webhook_secret.arn,
+      "${aws_secretsmanager_secret.main.arn}-*",
     ]
   }
 }
