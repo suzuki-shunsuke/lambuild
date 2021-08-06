@@ -171,23 +171,6 @@ func (handler *Handler) handleBuildspec(ctx context.Context, logE *logrus.Entry,
 		cb = codebuild.New(sess, &aws.Config{Credentials: creds, Region: aws.String(handler.Config.Region)})
 	}
 
-	if buildInput.Batched {
-		buildInput.BatchBuild.ProjectName = aws.String(projectName)
-		buildInput.BatchBuild.SourceVersion = aws.String(data.SHA)
-		if hook.ServiceRole != "" {
-			buildInput.BatchBuild.ServiceRoleOverride = aws.String(hook.ServiceRole)
-		}
-		buildOut, err := cb.StartBuildBatchWithContext(ctx, buildInput.BatchBuild)
-		if err != nil {
-			logE.WithError(err).Error("start a batch build")
-			return fmt.Errorf("start a batch build: %w", err)
-		}
-		logE.WithFields(logrus.Fields{
-			"build_arn": *buildOut.BuildBatch.Arn,
-		}).Info("start a batch build")
-		return nil
-	}
-
 	for _, build := range buildInput.Builds {
 		build.ProjectName = aws.String(projectName)
 		build.SourceVersion = aws.String(data.SHA)

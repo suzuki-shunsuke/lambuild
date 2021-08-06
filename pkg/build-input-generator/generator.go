@@ -29,30 +29,6 @@ func GenerateInput(logE *logrus.Entry, buildStatusContext template.Template, dat
 		}
 	}
 
-	if len(buildspec.Batch.BuildGraph) != 0 {
-		logE.Debug("handling build-graph")
-		if err := handleGraph(buildStatusContext, &buildInput, logE, data, buildspec); err != nil {
-			return buildInput, err
-		}
-		return buildInput, nil
-	}
-
-	if len(buildspec.Batch.BuildList) != 0 {
-		logE.Debug("handling build-list")
-		if err := handleList(&buildInput, logE, buildStatusContext, data, buildspec); err != nil {
-			return buildInput, err
-		}
-		return buildInput, nil
-	}
-
-	if !buildspec.Batch.BuildMatrix.Empty() {
-		logE.Debug("handling build-matrix")
-		if err := handleMatrix(&buildInput, logE, buildStatusContext, data, buildspec); err != nil {
-			return buildInput, err
-		}
-		return buildInput, nil
-	}
-
 	return handleBuild(data, buildspec)
 }
 
@@ -97,22 +73,4 @@ func getLambuildEnvVars(data *domain.Data, lambuild bspec.Lambuild) ([]*codebuil
 		})
 	}
 	return envs, nil
-}
-
-func setBatchBuildInput(input *codebuild.StartBuildBatchInput, buildspec bspec.Buildspec, data *domain.Data) error {
-	envs, err := getLambuildEnvVars(data, buildspec.Lambuild)
-	if err != nil {
-		return err
-	}
-	if len(envs) != 0 {
-		input.EnvironmentVariablesOverride = envs
-	}
-
-	s, err := buildspec.ToYAML(data.Convert())
-	if err != nil {
-		return fmt.Errorf("marshal a buildspec: %w", err)
-	}
-	input.BuildspecOverride = aws.String(string(s))
-
-	return nil
 }
