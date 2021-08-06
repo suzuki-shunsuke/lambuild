@@ -29,7 +29,6 @@ func Test_handleBuild(t *testing.T) {
 				Builds: []*codebuild.StartBuildInput{
 					{},
 				},
-				BatchBuild: &codebuild.StartBuildBatchInput{},
 			},
 		},
 	}

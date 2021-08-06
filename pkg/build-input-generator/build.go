@@ -10,9 +10,7 @@ import (
 )
 
 func handleBuild(data *domain.Data, buildspec bspec.Buildspec) (domain.BuildInput, error) {
-	buildInput := domain.BuildInput{
-		BatchBuild: &codebuild.StartBuildBatchInput{},
-	}
+	buildInput := domain.BuildInput{}
 
 	items := buildspec.Lambuild.Items
 	if len(items) == 0 {

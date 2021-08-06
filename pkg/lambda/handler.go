@@ -28,7 +28,6 @@ type Handler struct {
 }
 
 type CodeBuild interface {
-	StartBuildBatchWithContext(ctx aws.Context, input *codebuild.StartBuildBatchInput, opts ...request.Option) (*codebuild.StartBuildBatchOutput, error)
 	StartBuildWithContext(ctx aws.Context, input *codebuild.StartBuildInput, opts ...request.Option) (*codebuild.StartBuildOutput, error)
 }
 

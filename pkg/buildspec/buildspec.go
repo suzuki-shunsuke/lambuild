@@ -9,7 +9,6 @@ import (
 )
 
 type Buildspec struct {
-	Batch    Batch                  `yaml:",omitempty"`
 	Lambuild Lambuild               `yaml:",omitempty"`
 	Map      map[string]interface{} `yaml:",inline,omitempty"`
 	Phases   Phases
@@ -23,7 +22,6 @@ func (buildspec *Buildspec) filter(param interface{}) (map[string]interface{}, e
 		}
 		m[k] = v
 	}
-	m["batch"] = buildspec.Batch
 	phases, err := buildspec.Phases.Filter(param)
 	if err != nil {
 		return nil, err
@@ -75,12 +73,6 @@ type Item struct {
 
 type LambuildEnv struct {
 	Variables map[string]expr.String
-}
-
-type Batch struct {
-	BuildGraph  []GraphElement `yaml:"build-graph,omitempty"`
-	BuildList   []ListElement  `yaml:"build-list,omitempty"`
-	BuildMatrix Matrix         `yaml:"build-matrix,omitempty"`
 }
 
 type Env struct {

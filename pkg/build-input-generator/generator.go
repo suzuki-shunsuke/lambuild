@@ -13,9 +13,7 @@ import (
 )
 
 func GenerateInput(logE *logrus.Entry, buildStatusContext template.Template, data *domain.Data, buildspec bspec.Buildspec, repo config.Repository) (domain.BuildInput, error) {
-	buildInput := domain.BuildInput{
-		BatchBuild: &codebuild.StartBuildBatchInput{},
-	}
+	buildInput := domain.BuildInput{}
 
 	if !buildspec.Lambuild.If.Empty() {
 		f, err := buildspec.Lambuild.If.Run(data.Convert())
