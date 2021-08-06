@@ -54,10 +54,8 @@ repositories:
 log-level: debug
 build-status-context: yoo
 error-notification-template: foo
-ssm-parameter:
-  parameter-name:
-    github-token: github_token
-    webhook-secret: github_webhook_secret
+secrets-manager:
+  secret-id: lambuild
 `,
 		},
 	}

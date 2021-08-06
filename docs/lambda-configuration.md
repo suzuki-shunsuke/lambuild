@@ -30,10 +30,8 @@ e.g.
 ```yaml
 region: us-east-1
 log-level: debug
-ssm-parameter:
-  parameter-name:
-    github-token: lambuild_github_token
-    webhook-secret: lambuild_webhook_secret
+secrets-manager:
+  secret-id: lambuild
 build-status-context: "AWS Codebuild ({{.event.Headers.Event}})"
 error-notification-template: |
   lambuild failed to procceed the request.
@@ -51,18 +49,10 @@ path | environment variable name | type | required | default | description
 --- | --- | --- | --- | --- | ---
 .region | REGION | string | true | | AWS Region
 .log-level | LOG_LEVEL | string | false | info | log level of [logrus](https://github.com/sirupsen/logrus)
-.ssm-parameter | | [ssm-parameter](#type-ssm-parameter) | false | | AWS Systems Manager Parameter Store configuration. Either `.ssm-parameter` or `.secrets-manager` is required
-.secrets-manager | | [secrets-manager](#type-secrets-manager) | false | | AWS Secrets Manager's Secret Configuration. Either `.ssm-parameter` or `.secrets-manager` is required
+.secrets-manager | | [secrets-manager](#type-secrets-manager) | true | | AWS Secrets Manager's Secret Configuration
 .build-status-context | BUILD_STATUS_CONTEXT | [template string](#type-template-string) | false | not specified | [`build-status-config-override`'s context](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/codebuild/start-build.html)
 .error-notification-template | ERROR_NOTIFICATION_TEMPLATE | [template string](#type-template-string) | false | | [Error notification template](error-notification.md)
 .repositories | | [][repository](#type-repository) | true | | |
-
-### type: ssm-parameter
-
-path | environment variable name | type | required | description
---- | --- | --- | --- | ---
-.parameter-name.github-token | SSM_PARAMETER_NAME_GITHUB_TOKEN | string | true | Systems Manager's Parameter Name against which GitHub Personal Access Token is registered
-.parameter-name.webhook-secret | SSM_PARAMETER_NAME_WEBHOOK_SECRET | string | true | Systems Manager's Parameter Name against which GitHub Webhook secret is registered
 
 ### type: secrets-manager
 

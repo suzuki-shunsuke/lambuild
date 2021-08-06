@@ -49,22 +49,17 @@ variable "project_name" {
   default     = "test-lambuild"
 }
 
-variable "ssm_parameter_github_token_name" {
+variable "secret_id" {
   type    = string
-  default = "/test-lambuild/github_token"
+  default = "lambuild"
 }
 
-variable "ssm_parameter_github_token_value" {
+variable "github_token" {
   type      = string
   sensitive = true
 }
 
-variable "ssm_parameter_webhook_secret_name" {
-  type    = string
-  default = "/test-lambuild/webhook_secret"
-}
-
-variable "ssm_parameter_webhook_secret_value" {
+variable "webhook_secret" {
   type      = string
   sensitive = true
 }

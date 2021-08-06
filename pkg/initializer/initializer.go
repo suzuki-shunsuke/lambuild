@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codebuild"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
-	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/sirupsen/logrus"
 	"github.com/suzuki-shunsuke/lambuild/pkg/config"
@@ -41,14 +40,6 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 		}
 	}
 
-	if cfg.SSMParameter.ParameterName.GitHubToken == "" {
-		cfg.SSMParameter.ParameterName.GitHubToken = os.Getenv("SSM_PARAMETER_NAME_GITHUB_TOKEN")
-	}
-
-	if cfg.SSMParameter.ParameterName.WebhookSecret == "" {
-		cfg.SSMParameter.ParameterName.WebhookSecret = os.Getenv("SSM_PARAMETER_NAME_WEBHOOK_SECRET")
-	}
-
 	if cfg.SecretsManager.SecretID == "" {
 		cfg.SecretsManager.SecretID = os.Getenv("SECRETS_MANAGER_SECRET_ID")
 	}
@@ -75,13 +66,6 @@ func InitializeHandler(ctx context.Context, handler *lambda.Handler) error {
 
 	sess := session.Must(session.NewSession())
 	switch {
-	case cfg.SSMParameter.ParameterName.GitHubToken != "":
-		ssmSvc := ssm.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
-		secret, err := readSecretFromSSM(ctx, ssmSvc, handler.Config.SSMParameter.ParameterName)
-		if err != nil {
-			return err
-		}
-		handler.Secret = secret
 	case cfg.SecretsManager.SecretID != "":
 		svc := secretsmanager.New(sess, aws.NewConfig().WithRegion(handler.Config.Region))
 		secret, err := readSecretFromSecretsManager(ctx, svc, handler.Config.SecretsManager)

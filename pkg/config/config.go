@@ -14,7 +14,6 @@ type Config struct {
 	LogLevel                  LogLevel          `yaml:"log-level"`
 	BuildStatusContext        template.Template `yaml:"build-status-context"`
 	ErrorNotificationTemplate template.Template `yaml:"error-notification-template"`
-	SSMParameter              SSMParameter      `yaml:"ssm-parameter"`
 	SecretsManager            SecretsManager    `yaml:"secrets-manager"`
 }
 
@@ -37,15 +36,6 @@ func (logLevel *LogLevel) UnmarshalYAML(unmarshal func(interface{}) error) error
 
 func (logLevel *LogLevel) Get() logrus.Level {
 	return logLevel.level
-}
-
-type SSMParameter struct {
-	ParameterName ParameterName `yaml:"parameter-name"`
-}
-
-type ParameterName struct {
-	GitHubToken   string `yaml:"github-token"`
-	WebhookSecret string `yaml:"webhook-secret"`
 }
 
 type Repository struct {

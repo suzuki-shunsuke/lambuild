@@ -1,10 +1,8 @@
 ---
 log-level: debug
 region: "${region}"
-ssm-parameter:
-  parameter-name:
-    github-token: "${ssm_parameter_github_token_name}"
-    webhook-secret: "${ssm_parameter_webhook_secret_name}"
+secrets-maanger:
+  secret-id: "${secret_id}"
 repositories:
   - name: "${repo_full_name}"
     codebuild:
