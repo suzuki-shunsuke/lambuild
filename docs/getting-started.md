@@ -16,7 +16,6 @@
 * Create AWS resources
   * [Create a CodeBuild Project](https://docs.aws.amazon.com/codebuild/latest/userguide/create-project.html)
     * source: GitHub Repository
-    * Enable Batch Build
     * Don't configure Webhook
     * [To checkout the source repository in build, configure your personal access token](https://docs.aws.amazon.com/codebuild/latest/userguide/access-tokens.html)
   * [Create Lambda Function](https://docs.aws.amazon.com/lambda/latest/dg/getting-started-create-function.html)

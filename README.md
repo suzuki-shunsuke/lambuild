@@ -17,7 +17,6 @@ Instead of [AWS CodeBuild's GitHub webhook events support](https://docs.aws.amaz
 * [Custom Environment Variables with GitHub Webhook Event and associated Pull Request](#custom-environment-variables-with-gitHub-webhook-event-and-associated-pull-request)
 * [Override Build Configuration like `image` in buildspec](#override-build-configuration-like-image-in-buildspec)
 * [Run multiple builds based on the same buildspec without Batch Build](#run-multiple-builds-based-on-the-same-buildspec-without-batch-build)
-* [Run Batch Build's each build conditionally](#run-batch-builds-each-build-conditionally)
 * etc
 
 ## Link
@@ -116,22 +115,6 @@ Maybe you prefer this feature rather than Batch Build, because
 * It takes time to run Batch Build
 * Batch Build is a little inconvenient
 
-### Run Batch Build's each build conditionally
-
-e.g.
-
-```yaml
-version: 0.2
-batch:
-  build-list:
-    - identifier: foo
-      buildspec: foo/buildspec.yaml
-      if: 'any(getPRFileNames(), {# startsWith "foo/"})'
-    - identifier: renovate
-      buildspec: buildspec/renovate.yaml
-      if: 'any(getPRFileNames(), {# == "renovate.json"})'
-```
-
 ## Architecture
 
 ```
@@ -148,7 +131,7 @@ _This image is created with [diagrams.net](https://www.diagrams.net/)_
 1. Request is filtered with hook configuration
 1. Configuration file is downloaded from the source repository
 1. buildspec is generated
-1. Build or Batch Build is run
+1. Build is run
 
 ## Supported GitHub Events
 

@@ -31,8 +31,3 @@ e.g.
 ```yaml
   build-status-context: "{{.item.name}} ({{.event.Headers.Event}}) {{.aws.Codebuild.ProjectName}} {{.aws.Region}} {{.aws.AccountID}}"
 ```
-
-But unfortunately, AWS CodeBuild's `StartBuildBatch` API doesn't support specifying the build status context unlike `StartBuild` API.
-
-* [StartBuild API](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_StartBuild.html#API_StartBuild_RequestSyntax)
-* [StartBuildBatch API](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_StartBuildBatch.html)
