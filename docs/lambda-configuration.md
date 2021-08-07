@@ -80,7 +80,6 @@ path | type | required | default | description
 --- | --- | --- | --- | ---
 .config | string | false | `lambuild.yaml` | relative path from repository's root directory to the buildspec template file or directory on the source repository. 
 .if | string expression | false | "true" | the evaluated result must be a boolean. if an event doesn't match the condition, the event is ignored. If this field is empty, no event is ignored
-.service-role | string | false | | CodeBuild Service Role ARN
 .project-name | string | false | | CodeBuild Project Name
 .assume-role-arn | string | false | | Assume Role ARN to start builds
 
@@ -88,47 +87,6 @@ path | type | required | default | description
 
 If `.config` is a directory, files in the directory are treated as configuration files and procceeded in parallel, which means builds are run in parallel.
 The file extension of configuration file must be `.yml` or `.yaml`, otherwise the file is ignored.
-
-### hook.service-role
-
-If CodeBuild Service Role has strong permissions,
-dangerous code can be run in CI of pull requests.
-`lambuild` supports configuring Service Role per hook,
-so we can use restricted Service Role for pull requests.
-
-e.g.
-
-```yaml
-hooks:
-  - if: |
-      event.Headers.Event == "push" and
-      ref == "refs/heads/main"
-  - if: |
-      event.Headers.Event == "pull_request" and
-      event.Payload.GetAction() in ["opened", "edited", "reopend", "synchronize"]
-    # prevent from changing AWS resources in pull requests
-    service-role: "arn:aws:iam::<AWS Account ID>:role/read-only"
-```
-
-To change Service Role, we have to add the permission `iam:PassRole` to Lambda Execution Role.
-
-e.g.
-
-```json
-{
-  "Effect": "Allow",
-  "Action": "iam:PassRole",
-  "Resource": "arn:aws:iam::<AWS Account ID>:role/read-only",
-  "Condition": {
-    "StringEquals": {"iam:PassedToService": "codebuild.amazonaws.com"},
-    "StringLike": {
-      "iam:AssociatedResourceARN": [
-        "arn:aws:codebuild:us-east-1:<AWS Account ID>:project/test-lambuild"
-      ]
-    }
-  }
-}
-```
 
 ## type: template string
 

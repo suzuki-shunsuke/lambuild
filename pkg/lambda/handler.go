@@ -173,9 +173,6 @@ func (handler *Handler) handleBuildspec(ctx context.Context, logE *logrus.Entry,
 	for _, build := range buildInput.Builds {
 		build.ProjectName = aws.String(projectName)
 		build.SourceVersion = aws.String(data.SHA)
-		if hook.ServiceRole != "" {
-			build.ServiceRoleOverride = aws.String(hook.ServiceRole)
-		}
 		buildOut, err := cb.StartBuildWithContext(ctx, build)
 		if err != nil {
 			logE.WithError(err).Error("start a build")
