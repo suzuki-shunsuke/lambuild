@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antonmedv/expr v1.9.0
-	github.com/aws/aws-lambda-go v1.27.0
+	github.com/aws/aws-lambda-go v1.28.0
 	github.com/aws/aws-sdk-go v1.40.50
 	github.com/google/go-cmp v0.5.6
 	github.com/google/go-github/v37 v37.0.0
